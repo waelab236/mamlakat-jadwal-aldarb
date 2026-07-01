@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '@/lib/supabase';
 import { useStudent } from '@/lib/student-context';
 import { useSettings } from '@/lib/settings-context';
 import { formatNum } from '@/lib/numerals';
@@ -101,10 +100,11 @@ export default function WorksheetsPage() {
     setSaved(false);
   };
 
-  const save = async () => {
+  const save = () => {
     setSaving(true);
     const questions = generateWorksheetQuestions(tables, difficulty, ['fill']);
-    await supabase.from('worksheets').insert({
+    const sheet = {
+      id: Math.random().toString(36).slice(2) + Date.now().toString(36),
       title: title || 'ورقة عمل جدول الضرب',
       created_by: teacherName || 'معلم',
       table_numbers: tables,
@@ -113,7 +113,10 @@ export default function WorksheetsPage() {
       teacher_name: teacherName,
       school_name: schoolName,
       questions,
-    });
+      created_at: new Date().toISOString(),
+    };
+    const existing = JSON.parse(localStorage.getItem('mk_saved_sheets') || '[]');
+    localStorage.setItem('mk_saved_sheets', JSON.stringify([sheet, ...existing].slice(0, 30)));
     setSaved(true);
     setSaving(false);
   };

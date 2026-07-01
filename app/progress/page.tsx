@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useStudent } from '@/lib/student-context';
 import { useSettings } from '@/lib/settings-context';
 import { formatNum } from '@/lib/numerals';
-import { supabase } from '@/lib/supabase';
-import { Star, Trophy, Flame, Target, TrendingUp, BookOpen, RefreshCw } from 'lucide-react';
+import { Star, Trophy, Flame, Target, TrendingUp, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 
 const AVATARS: Record<string, string> = {
@@ -20,26 +18,21 @@ const TABLE_COLORS: Record<number, string> = {
   9: 'bg-rose-400', 10: 'bg-amber-400', 11: 'bg-violet-400', 12: 'bg-red-400',
 };
 
-export default function ProgressPage() {
-  const { student, tableProgress } = useStudent();
-  const { numberSystem } = useSettings();
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [achievements, setAchievements] = useState<any[]>([]);
-  const [earnedAchievements, setEarnedAchievements] = useState<string[]>([]);
+const ACHIEVEMENTS = [
+  { key: 'first_star',   title_ar: 'أول نجمة',         icon: '⭐', req_type: 'stars',   req: 1   },
+  { key: 'ten_stars',    title_ar: 'عشر نجوم',         icon: '🌟', req_type: 'stars',   req: 10  },
+  { key: 'fifty_stars',  title_ar: 'خمسون نجمة',       icon: '💫', req_type: 'stars',   req: 50  },
+  { key: 'table_1',      title_ar: 'إتقان جدول 1',     icon: '🏰', req_type: 'mastery', req: 1   },
+  { key: 'table_5',      title_ar: 'إتقان جدول 5',     icon: '🌉', req_type: 'mastery', req: 5   },
+  { key: 'table_10',     title_ar: 'إتقان جدول 10',    icon: '👑', req_type: 'mastery', req: 10  },
+  { key: 'table_12',     title_ar: 'إتقان جدول 12',    icon: '🏆', req_type: 'mastery', req: 12  },
+  { key: 'perfect_quiz', title_ar: 'اختبار مثالي',     icon: '🎯', req_type: 'perfect', req: 1   },
+  { key: 'ten_sessions', title_ar: 'عشر جلسات',        icon: '📚', req_type: 'sessions',req: 10  },
+];
 
-  useEffect(() => {
-    if (!student) return;
-    (async () => {
-      const [sessRes, achRes, earnedRes] = await Promise.all([
-        supabase.from('quiz_sessions').select('*').eq('student_id', student.id).order('completed_at', { ascending: false }).limit(10),
-        supabase.from('achievements').select('*'),
-        supabase.from('student_achievements').select('achievement_key').eq('student_id', student.id),
-      ]);
-      setSessions(sessRes.data || []);
-      setAchievements(achRes.data || []);
-      setEarnedAchievements((earnedRes.data || []).map((e: any) => e.achievement_key));
-    })();
-  }, [student]);
+export default function ProgressPage() {
+  const { student, tableProgress, quizSessions } = useStudent();
+  const { numberSystem } = useSettings();
 
   if (!student) {
     return (
@@ -57,17 +50,29 @@ export default function ProgressPage() {
 
   const totalMastery = tableProgress.length > 0
     ? Math.round(tableProgress.reduce((sum, p) => sum + p.mastery_percent, 0) / 12) : 0;
-  const masteredTables = tableProgress.filter(p => p.mastery_percent >= 80).length;
-  const totalAttempts = tableProgress.reduce((sum, p) => sum + p.attempts, 0);
-  const totalCorrect = tableProgress.reduce((sum, p) => sum + p.correct, 0);
-  const overallAccuracy = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0;
+  const masteredTables    = tableProgress.filter(p => p.mastery_percent >= 80).length;
+  const totalAttempts     = tableProgress.reduce((sum, p) => sum + p.attempts, 0);
+  const totalCorrect      = tableProgress.reduce((sum, p) => sum + p.correct, 0);
+  const overallAccuracy   = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0;
+  const masteredTableNums = tableProgress.filter(p => p.mastery_percent >= 80).map(p => p.table_number);
+  const hasPerfect        = quizSessions.some(s => s.accuracy >= 100);
 
-  const weakTables = tableProgress.filter(p => p.mastery_percent < 60 && p.attempts > 0).sort((a, b) => a.mastery_percent - b.mastery_percent);
+  const isEarned = (ach: typeof ACHIEVEMENTS[number]): boolean => {
+    if (ach.req_type === 'stars')    return student.total_stars >= ach.req;
+    if (ach.req_type === 'mastery')  return masteredTableNums.includes(ach.req);
+    if (ach.req_type === 'perfect')  return hasPerfect;
+    if (ach.req_type === 'sessions') return quizSessions.length >= ach.req;
+    return false;
+  };
+
+  const weakTables   = tableProgress.filter(p => p.mastery_percent < 60 && p.attempts > 0).sort((a, b) => a.mastery_percent - b.mastery_percent);
   const strongTables = tableProgress.filter(p => p.mastery_percent >= 80);
+  const recentSessions = quizSessions.slice(0, 10);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white">
       <div className="max-w-5xl mx-auto px-4 py-8">
+
         {/* Profile Header */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
           className="bg-gradient-to-br from-sky-400 to-blue-600 text-white rounded-3xl p-8 mb-8 shadow-xl relative overflow-hidden">
@@ -100,10 +105,10 @@ export default function ProgressPage() {
         {/* Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'التقدم الكلي', value: `${formatNum(totalMastery, numberSystem)}%`, icon: TrendingUp, color: 'text-sky-600', bg: 'bg-sky-50', border: 'border-sky-200' },
-            { label: 'الجداول المُتقنة', value: `${formatNum(masteredTables, numberSystem)}/12`, icon: Trophy, color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-200' },
-            { label: 'الدقة الكلية', value: `${formatNum(overallAccuracy, numberSystem)}%`, icon: Target, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
-            { label: 'إجمالي الأسئلة', value: formatNum(totalAttempts, numberSystem), icon: BookOpen, color: 'text-pink-600', bg: 'bg-pink-50', border: 'border-pink-200' },
+            { label: 'التقدم الكلي',       value: `${formatNum(totalMastery, numberSystem)}%`,       icon: TrendingUp, color: 'text-sky-600',  bg: 'bg-sky-50',    border: 'border-sky-200'    },
+            { label: 'الجداول المُتقنة',   value: `${formatNum(masteredTables, numberSystem)}/12`,   icon: Trophy,     color: 'text-yellow-600',bg: 'bg-yellow-50', border: 'border-yellow-200' },
+            { label: 'الدقة الكلية',       value: `${formatNum(overallAccuracy, numberSystem)}%`,    icon: Target,     color: 'text-green-600', bg: 'bg-green-50',  border: 'border-green-200'  },
+            { label: 'إجمالي الأسئلة',     value: formatNum(totalAttempts, numberSystem),            icon: BookOpen,   color: 'text-pink-600',  bg: 'bg-pink-50',   border: 'border-pink-200'   },
           ].map((stat, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}
               className={`${stat.bg} ${stat.border} border-2 rounded-2xl p-4 text-center`}>
@@ -121,7 +126,7 @@ export default function ProgressPage() {
           </h2>
           <div className="space-y-3">
             {Array.from({ length: 12 }, (_, i) => i + 1).map(num => {
-              const prog = tableProgress.find(p => p.table_number === num);
+              const prog    = tableProgress.find(p => p.table_number === num);
               const mastery = prog?.mastery_percent || 0;
               return (
                 <div key={num} className="flex items-center gap-3">
@@ -151,7 +156,7 @@ export default function ProgressPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
           {weakTables.length > 0 && (
             <div className="bg-red-50 border-2 border-red-200 rounded-3xl p-5">
-              <h3 className="font-black text-red-700 mb-3 flex items-center gap-2">⚠️ تحتاج تدريباً أكثر</h3>
+              <h3 className="font-black text-red-700 mb-3">⚠️ تحتاج تدريباً أكثر</h3>
               <div className="space-y-2">
                 {weakTables.slice(0, 4).map(p => (
                   <Link key={p.table_number} href={`/tables/${p.table_number}`}
@@ -165,7 +170,7 @@ export default function ProgressPage() {
           )}
           {strongTables.length > 0 && (
             <div className="bg-green-50 border-2 border-green-200 rounded-3xl p-5">
-              <h3 className="font-black text-green-700 mb-3 flex items-center gap-2">⭐ جداول مُتقنة</h3>
+              <h3 className="font-black text-green-700 mb-3">⭐ جداول مُتقنة</h3>
               <div className="flex flex-wrap gap-2">
                 {strongTables.map(p => (
                   <div key={p.table_number} className={`${TABLE_COLORS[p.table_number]} text-white font-black w-12 h-12 rounded-xl flex items-center justify-center text-lg`}>
@@ -183,13 +188,12 @@ export default function ProgressPage() {
             <Trophy className="w-5 h-5 text-yellow-500" /> الإنجازات
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {achievements.map(ach => {
-              const earned = earnedAchievements.includes(ach.key);
+            {ACHIEVEMENTS.map(ach => {
+              const earned = isEarned(ach);
               return (
                 <div key={ach.key} className={`rounded-2xl p-3 text-center border-2 transition-all ${earned ? 'bg-yellow-50 border-yellow-300 shadow-md' : 'bg-gray-50 border-gray-200 opacity-50'}`}>
-                  <div className="text-3xl mb-2">{earned ? '🏅' : '🔒'}</div>
+                  <div className="text-3xl mb-2">{earned ? ach.icon : '🔒'}</div>
                   <div className={`text-xs font-black ${earned ? 'text-yellow-700' : 'text-gray-400'}`}>{ach.title_ar}</div>
-                  {earned && <div className="text-xs text-gray-500 mt-1">{ach.description_ar}</div>}
                 </div>
               );
             })}
@@ -197,11 +201,11 @@ export default function ProgressPage() {
         </div>
 
         {/* Recent Sessions */}
-        {sessions.length > 0 && (
-          <div className="bg-white rounded-3xl p-6 shadow-md border border-sky-100">
+        {recentSessions.length > 0 && (
+          <div className="bg-white rounded-3xl p-6 shadow-md border border-sky-100 mb-8">
             <h2 className="text-xl font-black text-sky-700 mb-4">آخر الجلسات</h2>
             <div className="space-y-2">
-              {sessions.map(s => (
+              {recentSessions.map(s => (
                 <div key={s.id} className="flex items-center justify-between bg-sky-50 rounded-xl px-4 py-3 border border-sky-100">
                   <div>
                     <span className="font-bold text-sky-700 text-sm">{s.session_type === 'quiz' ? 'اختبار' : 'ممارسة'}</span>
@@ -219,12 +223,10 @@ export default function ProgressPage() {
           </div>
         )}
 
-        {/* AI Recommendations */}
+        {/* Recommendations */}
         {weakTables.length > 0 && (
-          <div className="mt-8 bg-gradient-to-br from-sky-50 to-blue-50 border-2 border-sky-200 rounded-3xl p-6">
-            <h3 className="font-black text-sky-700 text-xl mb-4 flex items-center gap-2">
-              🤖 توصيات ذكية
-            </h3>
+          <div className="bg-gradient-to-br from-sky-50 to-blue-50 border-2 border-sky-200 rounded-3xl p-6">
+            <h3 className="font-black text-sky-700 text-xl mb-4">🤖 توصيات ذكية</h3>
             <ul className="space-y-2">
               <li className="flex items-start gap-2 text-sky-700">
                 <span className="text-green-500 mt-0.5">✓</span>

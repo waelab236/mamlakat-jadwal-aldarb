@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStudent } from '@/lib/student-context';
 import { useSettings } from '@/lib/settings-context';
 import { formatNum } from '@/lib/numerals';
-import { supabase } from '@/lib/supabase';
 import { Star, Timer, RefreshCw, CheckCircle, XCircle, Zap } from 'lucide-react';
 
 type QuizType = 'multiple' | 'truefalse' | 'fill' | 'timed';
@@ -213,25 +212,22 @@ function QuizGame({ quizType, tables, onEnd }: { quizType: QuizType; tables: num
 }
 
 export default function QuizzesPage() {
-  const { student, addStars } = useStudent();
+  const { student, addStars, saveQuizSession } = useStudent();
   const { numberSystem } = useSettings();
   const [quizType, setQuizType] = useState<QuizType | null>(null);
   const [tables, setTables] = useState<number[]>([2, 3, 4, 5]);
   const [gameKey, setGameKey] = useState(0);
 
-  const handleEnd = async (score: number, total: number) => {
-    if (student) {
-      await supabase.from('quiz_sessions').insert({
-        student_id: student.id,
-        session_type: 'quiz',
-        table_numbers: tables,
-        score,
-        accuracy: Math.round((score / total) * 100),
-        duration_seconds: 0,
-        total_questions: total,
-        correct_answers: score,
-      });
-    }
+  const handleEnd = (score: number, total: number) => {
+    saveQuizSession({
+      session_type: 'quiz',
+      table_numbers: tables,
+      score,
+      accuracy: Math.round((score / total) * 100),
+      duration_seconds: 0,
+      total_questions: total,
+      correct_answers: score,
+    });
     setQuizType(null);
     setGameKey(k => k + 1);
   };

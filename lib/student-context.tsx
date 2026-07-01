@@ -1,105 +1,150 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase, Student, TableProgress } from './supabase';
+import type { Student, TableProgress, QuizSession } from './supabase';
 
+// ── localStorage keys ────────────────────────────────────────────────────────
+const KEY_STUDENT   = 'mk_student';
+const KEY_PROGRESS  = 'mk_progress';
+const KEY_SESSIONS  = 'mk_sessions';
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function loadJSON<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveJSON(key: string, value: unknown) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function uuid(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+// ── context type ─────────────────────────────────────────────────────────────
 type StudentContextType = {
   student: Student | null;
   tableProgress: TableProgress[];
+  quizSessions: QuizSession[];
   isLoading: boolean;
   setStudent: (s: Student | null) => void;
   refreshProgress: () => void;
   addStars: (count: number) => void;
   updateTableProgress: (tableNum: number, correct: boolean) => void;
+  saveQuizSession: (session: Omit<QuizSession, 'id' | 'student_id' | 'completed_at'>) => void;
 };
 
 const StudentContext = createContext<StudentContextType>({
   student: null,
   tableProgress: [],
+  quizSessions: [],
   isLoading: true,
   setStudent: () => {},
   refreshProgress: () => {},
   addStars: () => {},
   updateTableProgress: () => {},
+  saveQuizSession: () => {},
 });
 
+// ── provider ─────────────────────────────────────────────────────────────────
 export function StudentProvider({ children }: { children: ReactNode }) {
   const [student, setStudentState] = useState<Student | null>(null);
   const [tableProgress, setTableProgress] = useState<TableProgress[]>([]);
+  const [quizSessions, setQuizSessions] = useState<QuizSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('mk_student_id');
-    if (stored) {
-      loadStudent(stored);
-    } else {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const loadStudent = async (id: string) => {
-    const { data } = await supabase.from('students').select('*').eq('id', id).maybeSingle();
-    if (data) {
-      setStudentState(data);
-      loadProgress(id);
+    const saved = loadJSON<Student | null>(KEY_STUDENT, null);
+    if (saved) {
+      setStudentState(saved);
+      setTableProgress(loadJSON<TableProgress[]>(KEY_PROGRESS, []));
+      setQuizSessions(loadJSON<QuizSession[]>(KEY_SESSIONS, []));
     }
     setIsLoading(false);
-  };
+  }, []);
 
-  const loadProgress = async (id: string) => {
-    const { data } = await supabase.from('table_progress').select('*').eq('student_id', id);
-    if (data) setTableProgress(data);
+  const persistStudent = (s: Student | null) => {
+    setStudentState(s);
+    if (s) saveJSON(KEY_STUDENT, s);
+    else localStorage.removeItem(KEY_STUDENT);
   };
 
   const setStudent = (s: Student | null) => {
-    setStudentState(s);
-    if (s) {
-      localStorage.setItem('mk_student_id', s.id);
-      loadProgress(s.id);
-    } else {
-      localStorage.removeItem('mk_student_id');
+    persistStudent(s);
+    if (!s) {
       setTableProgress([]);
+      setQuizSessions([]);
     }
   };
 
   const refreshProgress = () => {
-    if (student) loadProgress(student.id);
+    setTableProgress(loadJSON<TableProgress[]>(KEY_PROGRESS, []));
   };
 
-  const addStars = async (count: number) => {
+  const addStars = (count: number) => {
     if (!student) return;
-    const newTotal = student.total_stars + count;
-    await supabase.from('students').update({ total_stars: newTotal, updated_at: new Date().toISOString() }).eq('id', student.id);
-    setStudentState({ ...student, total_stars: newTotal });
+    const updated: Student = { ...student, total_stars: student.total_stars + count };
+    persistStudent(updated);
   };
 
-  const updateTableProgress = async (tableNum: number, correct: boolean) => {
+  const updateTableProgress = (tableNum: number, correct: boolean) => {
     if (!student) return;
-    const existing = tableProgress.find(p => p.table_number === tableNum);
+    const current = loadJSON<TableProgress[]>(KEY_PROGRESS, []);
+    const existing = current.find(p => p.table_number === tableNum);
+    let updated: TableProgress[];
     if (existing) {
-      const newCorrect = existing.correct + (correct ? 1 : 0);
+      const newCorrect  = existing.correct + (correct ? 1 : 0);
       const newAttempts = existing.attempts + 1;
-      const mastery = Math.min(100, Math.round((newCorrect / newAttempts) * 100));
-      await supabase.from('table_progress').update({
-        correct: newCorrect,
-        attempts: newAttempts,
-        mastery_percent: mastery,
-        last_practiced: new Date().toISOString(),
-      }).eq('id', existing.id);
+      const mastery     = Math.min(100, Math.round((newCorrect / newAttempts) * 100));
+      updated = current.map(p =>
+        p.table_number === tableNum
+          ? { ...p, correct: newCorrect, attempts: newAttempts, mastery_percent: mastery, last_practiced: new Date().toISOString() }
+          : p
+      );
     } else {
-      await supabase.from('table_progress').insert({
-        student_id: student.id,
-        table_number: tableNum,
-        correct: correct ? 1 : 0,
-        attempts: 1,
-        mastery_percent: correct ? 100 : 0,
-      });
+      updated = [
+        ...current,
+        {
+          id: uuid(),
+          student_id: student.id,
+          table_number: tableNum,
+          correct: correct ? 1 : 0,
+          attempts: 1,
+          mastery_percent: correct ? 100 : 0,
+          last_practiced: new Date().toISOString(),
+        },
+      ];
     }
-    loadProgress(student.id);
+    saveJSON(KEY_PROGRESS, updated);
+    setTableProgress(updated);
+  };
+
+  const saveQuizSession = (session: Omit<QuizSession, 'id' | 'student_id' | 'completed_at'>) => {
+    if (!student) return;
+    const full: QuizSession = {
+      ...session,
+      id: uuid(),
+      student_id: student.id,
+      completed_at: new Date().toISOString(),
+    };
+    const current = loadJSON<QuizSession[]>(KEY_SESSIONS, []);
+    const updated  = [full, ...current].slice(0, 50); // keep last 50
+    saveJSON(KEY_SESSIONS, updated);
+    setQuizSessions(updated);
   };
 
   return (
-    <StudentContext.Provider value={{ student, tableProgress, isLoading, setStudent, refreshProgress, addStars, updateTableProgress }}>
+    <StudentContext.Provider value={{
+      student, tableProgress, quizSessions, isLoading,
+      setStudent, refreshProgress, addStars, updateTableProgress, saveQuizSession,
+    }}>
       {children}
     </StudentContext.Provider>
   );

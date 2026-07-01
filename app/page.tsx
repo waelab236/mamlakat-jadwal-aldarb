@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useStudent } from '@/lib/student-context';
 import { useSettings } from '@/lib/settings-context';
-import { supabase } from '@/lib/supabase';
 import { formatNum } from '@/lib/numerals';
+import type { Student } from '@/lib/supabase';
 import { Star, Trophy, Flame, BookOpen, Gamepad2, ChevronLeft, Plus } from 'lucide-react';
 
 const AVATARS = [
@@ -51,17 +51,22 @@ function StudentSetup({ onDone }: { onDone: () => void }) {
   const { setStudent } = useStudent();
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState('lion');
-  const [loading, setLoading] = useState(false);
 
-  const create = async () => {
+  const create = () => {
     if (!name.trim()) return;
-    setLoading(true);
-    const { data } = await supabase.from('students').insert({ name: name.trim(), avatar }).select().maybeSingle();
-    if (data) {
-      setStudent(data);
-      onDone();
-    }
-    setLoading(false);
+    const now = new Date().toISOString();
+    const newStudent: Student = {
+      id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+      name: name.trim(),
+      avatar,
+      level: 1,
+      total_stars: 0,
+      streak_days: 1,
+      last_active: now,
+      created_at: now,
+    };
+    setStudent(newStudent);
+    onDone();
   };
 
   return (
@@ -93,8 +98,8 @@ function StudentSetup({ onDone }: { onDone: () => void }) {
             ))}
           </div>
         </div>
-        <button onClick={create} disabled={!name.trim() || loading} className="w-full bg-gradient-to-r from-sky-400 to-blue-500 text-white py-3 rounded-xl font-black text-lg hover:opacity-90 disabled:opacity-50 transition-all shadow-md">
-          {loading ? '...' : 'ابدأ الرحلة! 🚀'}
+        <button onClick={create} disabled={!name.trim()} className="w-full bg-gradient-to-r from-sky-400 to-blue-500 text-white py-3 rounded-xl font-black text-lg hover:opacity-90 disabled:opacity-50 transition-all shadow-md">
+          ابدأ الرحلة! 🚀
         </button>
       </div>
     </motion.div>

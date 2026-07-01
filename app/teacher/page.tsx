@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { supabase } from '@/lib/supabase';
 import { useSettings } from '@/lib/settings-context';
 import { formatNum } from '@/lib/numerals';
 import html2canvas from 'html2canvas';
@@ -156,8 +155,9 @@ export default function TeacherPage() {
     setGenerated(true);
   };
 
-  const save = async () => {
-    await supabase.from('worksheets').insert({
+  const save = () => {
+    const sheet = {
+      id: Math.random().toString(36).slice(2) + Date.now().toString(36),
       title: title || getTitle(),
       created_by: teacherName || 'معلم',
       table_numbers: tables,
@@ -166,20 +166,25 @@ export default function TeacherPage() {
       teacher_name: teacherName,
       school_name: schoolName,
       questions,
-    });
+      created_at: new Date().toISOString(),
+    };
+    const existing = JSON.parse(localStorage.getItem('mk_saved_sheets') || '[]');
+    localStorage.setItem('mk_saved_sheets', JSON.stringify([sheet, ...existing].slice(0, 30)));
+    setSavedSheets(s => [sheet, ...s]);
     alert('تم حفظ الورقة بنجاح!');
   };
 
-  const loadSaved = async () => {
+  const loadSaved = () => {
     setLoadingSaved(true);
-    const { data } = await supabase.from('worksheets').select('*').order('created_at', { ascending: false }).limit(20);
-    setSavedSheets(data || []);
+    const data = JSON.parse(localStorage.getItem('mk_saved_sheets') || '[]');
+    setSavedSheets(data);
     setLoadingSaved(false);
   };
 
-  const deleteSaved = async (id: string) => {
-    await supabase.from('worksheets').delete().eq('id', id);
-    setSavedSheets(s => s.filter(x => x.id !== id));
+  const deleteSaved = (id: string) => {
+    const updated = savedSheets.filter(x => x.id !== id);
+    localStorage.setItem('mk_saved_sheets', JSON.stringify(updated));
+    setSavedSheets(updated);
   };
 
   const getTitle = () => {
