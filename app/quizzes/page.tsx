@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudent } from '@/lib/student-context';
 import { useSettings } from '@/lib/settings-context';
-import { formatNum } from '@/lib/numerals';
+import { formatNum, formatText } from '@/lib/numerals';
 import { Star, Timer, RefreshCw, CheckCircle, XCircle, Zap } from 'lucide-react';
 
 type QuizType = 'multiple' | 'truefalse' | 'fill' | 'timed';
@@ -15,7 +15,7 @@ function generateQuestion(tables: number[], type: QuizType) {
   const result = tableNum * b;
 
   if (type === 'truefalse') {
-    const isCorrect = Math.random() > 0.4;
+    const isCorrect = Math.random() > 0.5;
     const shownResult = isCorrect ? result : result + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 5) + 1);
     return {
       type,
@@ -137,7 +137,7 @@ function QuizGame({ quizType, tables, onEnd }: { quizType: QuizType; tables: num
 
       <motion.div key={idx} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }}>
         <div className="bg-gradient-to-r from-sky-400 to-blue-500 text-white rounded-2xl p-6 mb-6 text-center shadow-md">
-          <div className="text-4xl md:text-5xl font-black">{q.question}</div>
+          <div className="text-4xl md:text-5xl font-black">{formatText(q.question, numberSystem)}</div>
         </div>
 
         {(q.type === 'multiple' || q.type === 'timed') && (
@@ -150,7 +150,7 @@ function QuizGame({ quizType, tables, onEnd }: { quizType: QuizType; tables: num
                   selected === choice ? 'bg-red-50 border-red-300 text-red-400' :
                   'bg-gray-50 border-gray-200 text-gray-400'
                 }`}>
-                {choice}
+                {formatText(choice, numberSystem)}
               </motion.button>
             ))}
           </div>
@@ -174,24 +174,24 @@ function QuizGame({ quizType, tables, onEnd }: { quizType: QuizType; tables: num
 
         {q.type === 'fill' && (
           <div>
-            <div className="flex gap-3">
-              <input type="number" value={fillAnswer} onChange={e => setFillAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && fillAnswer && handleAnswer(fillAnswer)}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input type="text" value={fillAnswer} onChange={e => setFillAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && fillAnswer && handleAnswer(fillAnswer)}
                 placeholder="اكتب الإجابة..."
-                className={`flex-1 text-center text-3xl font-black border-2 rounded-xl py-4 focus:outline-none transition-colors ${
+                className={`flex-1 text-center text-3xl font-black border-2 rounded-xl py-4 focus:outline-none transition-colors min-w-0 ${
                   feedback === 'correct' ? 'border-green-400 bg-green-50 text-green-700' :
                   feedback === 'wrong' ? 'border-red-300 bg-red-50 text-red-600' :
                   'border-sky-300 focus:border-sky-500'
                 }`}
                 inputMode="numeric" disabled={!!feedback} />
               <button onClick={() => fillAnswer && handleAnswer(fillAnswer)} disabled={!fillAnswer || !!feedback}
-                className="bg-sky-500 text-white font-black py-4 px-6 rounded-xl hover:bg-sky-600 disabled:opacity-50 shadow-md">
+                className="bg-sky-500 text-white font-black py-4 px-6 rounded-xl hover:bg-sky-600 disabled:opacity-50 shadow-md flex-shrink-0 whitespace-nowrap">
                 تحقق
               </button>
             </div>
             <div className="grid grid-cols-5 gap-2 mt-3">
               {[1,2,3,4,5,6,7,8,9,0].map(n => (
-                <button key={n} onClick={() => setFillAnswer(a => a + n)} className="bg-sky-50 border border-sky-200 text-sky-700 font-black rounded-lg py-2 text-lg hover:bg-sky-100">
-                  {n}
+                <button key={n} onClick={() => setFillAnswer(a => a + String(n))} className="bg-sky-50 border border-sky-200 text-sky-700 font-black rounded-lg py-2 text-lg hover:bg-sky-100">
+                  {formatNum(n, numberSystem)}
                 </button>
               ))}
             </div>
@@ -202,7 +202,7 @@ function QuizGame({ quizType, tables, onEnd }: { quizType: QuizType; tables: num
           {feedback && (
             <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }}
               className={`mt-4 text-center py-3 rounded-xl font-black text-lg ${feedback === 'correct' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-              {feedback === 'correct' ? '✅ ممتاز! إجابة صحيحة!' : `❌ الإجابة الصحيحة: ${q.answer}`}
+              {feedback === 'correct' ? '✅ ممتاز! إجابة صحيحة!' : `❌ الإجابة الصحيحة: ${formatText(q.answer, numberSystem)}`}
             </motion.div>
           )}
         </AnimatePresence>

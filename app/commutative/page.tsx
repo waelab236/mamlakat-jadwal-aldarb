@@ -89,7 +89,7 @@ export default function CommutativePage() {
                     {(a1 > 5 || b1 > 5) && <div className="text-gray-400 text-xs self-center">...</div>}
                   </div>
                   <input
-                    type="number"
+                    type="text"
                     value={answer1}
                     onChange={e => setAnswer1(e.target.value)}
                     placeholder="؟"
@@ -123,7 +123,7 @@ export default function CommutativePage() {
                     {(a1 > 5 || b1 > 5) && <div className="text-gray-400 text-xs self-center">...</div>}
                   </div>
                   <input
-                    type="number"
+                    type="text"
                     value={answer2}
                     onChange={e => setAnswer2(e.target.value)}
                     placeholder="؟"

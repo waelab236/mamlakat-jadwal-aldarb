@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useSettings } from '@/lib/settings-context';
-import { formatNum } from '@/lib/numerals';
+import { formatNum, formatText } from '@/lib/numerals';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Printer, RefreshCw, PlusCircle, Trash2, Users, FileText, BookOpen, Star, Download, PackageOpen } from 'lucide-react';
@@ -58,7 +58,7 @@ function BulkWorksheetPreview({ num, wsType, numberSystem, language }: { num: nu
           <div className="flex justify-between text-xs mt-2">
             <span>الاسم: ________________</span>
             <span>التاريخ: ____________</span>
-            <span>الدرجة: __ / 12</span>
+            <span>الدرجة: __ / {formatNum(12, numberSystem)}</span>
           </div>
         </div>
       </div>
@@ -67,14 +67,14 @@ function BulkWorksheetPreview({ num, wsType, numberSystem, language }: { num: nu
         {wsType === 'writing' && (
           <div className="grid grid-cols-2 gap-3">
             {facts.map((f, i) => (
-              <div key={i} className="flex items-center gap-2"><span className="text-sky-600 font-black text-sm w-5">{i + 1}.</span><span className="text-gray-800 font-black">{formatNum(num, numberSystem)} × {formatNum(f.b, numberSystem)} =</span><span className="text-gray-400 font-black">____</span></div>
+              <div key={i} className="flex items-center gap-2"><span className="text-sky-600 font-black text-sm w-5">{formatNum(i + 1, numberSystem)}.</span><span className="text-gray-800 font-black">{formatNum(num, numberSystem)} × {formatNum(f.b, numberSystem)} =</span><span className="text-gray-400 font-black">____</span></div>
             ))}
           </div>
         )}
         {wsType === 'addition' && (
           <div className="grid grid-cols-1 gap-3">
             {facts.slice(0, 8).map((f, i) => (
-              <div key={i} className="flex items-center gap-2"><span className="text-sky-600 font-black text-sm w-5">{i + 1}.</span><span className="text-gray-800 font-black">{Array.from({ length: num }, () => formatNum(f.b, numberSystem)).join(' + ')} = ______</span></div>
+              <div key={i} className="flex items-center gap-2"><span className="text-sky-600 font-black text-sm w-5">{formatNum(i + 1, numberSystem)}.</span><span className="text-gray-800 font-black">{Array.from({ length: num }, () => formatNum(f.b, numberSystem)).join(' + ')} = ______</span></div>
             ))}
           </div>
         )}
@@ -102,7 +102,7 @@ function BulkWorksheetPreview({ num, wsType, numberSystem, language }: { num: nu
         {wsType === 'mixed' && (
           <div className="grid grid-cols-2 gap-3">
             {facts.sort(() => Math.random() - 0.5).slice(0, 10).map((f, i) => (
-              <div key={i} className="flex items-center gap-2"><span className="text-sky-600 font-black text-sm w-5">{i + 1}.</span><span className="text-gray-800 font-black">{formatNum(num, numberSystem)} × ___ = {formatNum(f.result, numberSystem)}</span></div>
+              <div key={i} className="flex items-center gap-2"><span className="text-sky-600 font-black text-sm w-5">{formatNum(i + 1, numberSystem)}.</span><span className="text-gray-800 font-black">{formatNum(num, numberSystem)} × ___ = {formatNum(f.result, numberSystem)}</span></div>
             ))}
           </div>
         )}
@@ -110,7 +110,7 @@ function BulkWorksheetPreview({ num, wsType, numberSystem, language }: { num: nu
           <div className="space-y-3">
             <div className="text-center font-black text-gray-700 mb-4">القسم أ: أكمل الفراغ</div>
             <div className="grid grid-cols-2 gap-2">
-              {facts.slice(0, 6).map((f, i) => (<div key={i} className="font-bold text-gray-700">{i + 1}. {formatNum(num, numberSystem)} × {formatNum(f.b, numberSystem)} = ____</div>))}
+              {facts.slice(0, 6).map((f, i) => (<div key={i} className="font-bold text-gray-700">{formatNum(i + 1, numberSystem)}. {formatNum(num, numberSystem)} × {formatNum(f.b, numberSystem)} = ____</div>))}
             </div>
             <div className="text-center font-black text-gray-700 mt-4 mb-2">القسم ب: صواب أم خطأ</div>
             <div className="grid grid-cols-1 gap-2">
@@ -323,15 +323,15 @@ export default function TeacherPage() {
                       <div className="grid grid-cols-3 gap-2 mt-3 text-sm">
                         <div>الاسم: {studentName || '___________'}</div>
                         <div className="text-center">المعلم: {teacherName || '___________'}</div>
-                        <div className="text-left">الدرجة: __ / {questions.length}</div>
+                        <div className="text-left">الدرجة: __ / {formatNum(questions.length, numberSystem)}</div>
                       </div>
                     </div>
                     <div className="p-4 notebook-lines">
                       <div className="grid grid-cols-2 gap-3">
                         {questions.map(q => (
                           <div key={q.num} className="flex items-center gap-2">
-                            <span className="text-sky-600 font-black text-sm w-5">{q.num}.</span>
-                            <span className="text-gray-800 font-black">{q.q}</span>
+                            <span className="text-sky-600 font-black text-sm w-5">{formatNum(q.num, numberSystem)}.</span>
+                            <span className="text-gray-800 font-black">{formatText(q.q, numberSystem)}</span>
                           </div>
                         ))}
                       </div>

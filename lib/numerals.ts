@@ -16,6 +16,11 @@ export function formatEquation(a: number, b: number, result: number, system: 'we
   return `${formatNum(a, system)} × ${formatNum(b, system)} = ${formatNum(result, system)}`;
 }
 
+export function formatText(text: string, system: 'western' | 'arabic'): string {
+  if (system === 'western') return text;
+  return text.replace(/[0-9]/g, d => ARABIC_DIGITS[parseInt(d)]);
+}
+
 // ═══════════════════════════════════════════════════════════
 // ARABIC NUMBER WORDS (complete up to 144 for 12×12)
 // ═══════════════════════════════════════════════════════════

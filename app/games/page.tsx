@@ -185,7 +185,7 @@ function SpeedChallenge({ onBack }: { onBack: () => void }) {
         <div className="text-center py-8">
           <div className="text-6xl mb-4">⚡</div>
           <h3 className="text-2xl font-black text-sky-700 mb-2">تحدي السرعة</h3>
-          <p className="text-gray-600 mb-6">أجب على أكبر عدد ممكن من الأسئلة في 60 ثانية!</p>
+          <p className="text-gray-600 mb-6">أجب على أكبر عدد ممكن من الأسئلة في formatNum(60, numberSystem) ثانية!</p>
           <button onClick={() => setStarted(true)} className="bg-gradient-to-r from-orange-400 to-red-500 text-white font-black py-4 px-10 rounded-2xl text-xl shadow-md hover:opacity-90">
             ابدأ! 🚀
           </button>
@@ -211,7 +211,7 @@ function SpeedChallenge({ onBack }: { onBack: () => void }) {
             {formatNum(q.a, numberSystem)} × {formatNum(q.b, numberSystem)} = ?
           </div>
           <div className={`flex gap-3 border-2 rounded-xl overflow-hidden ${feedback === true ? 'border-green-400' : feedback === false ? 'border-red-300' : 'border-sky-300'}`}>
-            <input ref={inputRef} type="number" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && answer()}
+            <input ref={inputRef} type="text" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && answer()}
               className="flex-1 text-center text-3xl font-black py-4 focus:outline-none bg-white" inputMode="numeric" placeholder="؟" />
             <button onClick={answer} className="bg-sky-500 text-white font-black px-8 hover:bg-sky-600">✓</button>
           </div>
@@ -298,7 +298,7 @@ function WheelGame({ onBack }: { onBack: () => void }) {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-4">
           <div className="text-3xl font-black text-sky-700 mb-3">{formatNum(tableNum, numberSystem)} × {formatNum(current, numberSystem)} = ?</div>
           <div className="flex gap-3">
-            <input type="number" value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && check()}
+            <input type="text" value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && check()}
               placeholder="الإجابة..." inputMode="numeric"
               className={`flex-1 text-center text-2xl font-black border-2 rounded-xl py-3 focus:outline-none ${
                 feedback === 'correct' ? 'border-green-400 bg-green-50' : feedback === 'wrong' ? 'border-red-300 bg-red-50' : 'border-sky-300 focus:border-sky-500'
@@ -325,7 +325,7 @@ const GAMES = [
   { id: 'wheel', name: 'عجلة الضرب', icon: '🎡', desc: 'أدر العجلة وأجب على السؤال!', color: 'from-sky-400 to-blue-500' },
   { id: 'memory', name: 'بطاقات الذاكرة', icon: '🃏', desc: 'طابق السؤال بالإجابة!', color: 'from-green-400 to-emerald-500' },
   { id: 'balloon', name: 'فقاعات البالون', icon: '🎈', desc: 'افقع البالون الصحيح!', color: 'from-pink-400 to-rose-500' },
-  { id: 'speed', name: 'تحدي السرعة', icon: '⚡', desc: 'أكبر عدد في 60 ثانية!', color: 'from-orange-400 to-red-500' },
+  { id: 'speed', name: 'تحدي السرعة', icon: '⚡', desc: 'أكبر عدد في formatNum(60, numberSystem) ثانية!', color: 'from-orange-400 to-red-500' },
 ];
 
 export default function GamesPage() {

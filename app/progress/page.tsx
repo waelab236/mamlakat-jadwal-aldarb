@@ -83,19 +83,19 @@ export default function ProgressPage() {
             </div>
             <div className="text-center sm:text-right flex-1">
               <h1 className="text-3xl font-black">{student.name}</h1>
-              <p className="text-blue-100 mt-1">المستوى {student.level} • المستكشف</p>
+              <p className="text-blue-100 mt-1">المستوى {formatNum(student.level, numberSystem)} • المستكشف</p>
               <div className="flex gap-4 mt-3 justify-center sm:justify-start flex-wrap">
                 <div className="flex items-center gap-1">
                   <Star className="w-5 h-5 text-yellow-300 fill-yellow-200" />
-                  <span className="font-black">{student.total_stars} نجمة</span>
+                  <span className="font-black">{formatNum(student.total_stars, numberSystem)} نجمة</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Flame className="w-5 h-5 text-orange-300" />
-                  <span className="font-black">{student.streak_days} يوم</span>
+                  <span className="font-black">{formatNum(student.streak_days, numberSystem)} يوم</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Trophy className="w-5 h-5 text-yellow-300" />
-                  <span className="font-black">{masteredTables} جدول مُتقن</span>
+                  <span className="font-black">{formatNum(masteredTables, numberSystem)} جدول مُتقن</span>
                 </div>
               </div>
             </div>
@@ -230,12 +230,12 @@ export default function ProgressPage() {
             <ul className="space-y-2">
               <li className="flex items-start gap-2 text-sky-700">
                 <span className="text-green-500 mt-0.5">✓</span>
-                <span>تدرب على جدول {weakTables[0]?.table_number} يومياً لمدة 10 دقائق</span>
+                <span>تدرب على جدول {formatNum(weakTables[0]?.table_number, numberSystem)} يومياً لمدة 10 دقائق</span>
               </li>
               {weakTables.length > 1 && (
                 <li className="flex items-start gap-2 text-sky-700">
                   <span className="text-green-500 mt-0.5">✓</span>
-                  <span>راجع جداول {weakTables.slice(0, 3).map(t => t.table_number).join('، ')} باستخدام ألعاب التذكر</span>
+                  <span>راجع جداول {weakTables.slice(0, 3).map(t => formatNum(t.table_number, numberSystem)).join('، ')} باستخدام ألعاب التذكر</span>
                 </li>
               )}
               <li className="flex items-start gap-2 text-sky-700">

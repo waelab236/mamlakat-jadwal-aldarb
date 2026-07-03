@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useStudent } from '@/lib/student-context';
 import { useSettings } from '@/lib/settings-context';
 import {
-  formatNum, formatEquation,
+  formatNum, formatEquation, formatText,
   speakEquationArabic, speakEquationEnglish,
   speakFullTableArabic, speakFullTableEnglish,
   startChant, pauseChant, resumeChant, stopChant,
@@ -18,6 +18,27 @@ import {
   Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel,
   Table, TableRow, TableCell, WidthType, BorderStyle,
 } from 'docx';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+
+async function saveFileNative(dataUrl: string, filename: string) {
+  if (Capacitor.isNativePlatform()) {
+    const base64Data = dataUrl.split(',')[1];
+    const safeName = filename.replace(/[^a-zA-Z0-9.\-]/g, '_');
+    try {
+      const result = await Filesystem.writeFile({
+        path: safeName, data: base64Data, directory: Directory.Documents, recursive: true,
+      });
+      await Share.share({ title: filename, url: result.uri, dialogTitle: 'حفظ أو مشاركة' });
+    } catch (e) {
+      console.error('Filesystem error:', e);
+      const link = document.createElement('a'); link.href = dataUrl; link.download = filename; link.click();
+    }
+  } else {
+    const link = document.createElement('a'); link.href = dataUrl; link.download = filename; link.click();
+  }
+}
 import {
   ChevronLeft, ChevronRight, Star, CheckCircle, RotateCcw, Volume2,
   Printer, Download, Lock, Trophy, Languages, Hash, Play, Pause,
@@ -210,7 +231,7 @@ function LearnSection({ num, config }: { num: number; config: typeof TABLE_CONFI
           <div className="relative">
             <div className="text-4xl mb-1">{config.animal}</div>
             <h2 className="text-3xl font-black">{language === 'ar' ? `جدول الضرب في ${formatNum(num, numberSystem)}` : `Table of ${formatNum(num, numberSystem)}`}</h2>
-            <p className="text-white/80 text-sm mt-1">{config.tip}</p>
+            <p className="text-white/80 text-sm mt-1">{formatText(config.tip, numberSystem)}</p>
           </div>
           <div className="absolute bottom-0 right-0 flex gap-1 text-lg opacity-40">🐝🌸⭐🦋</div>
         </div>
@@ -314,7 +335,7 @@ function LearnSection({ num, config }: { num: number; config: typeof TABLE_CONFI
             </motion.div>
           ))}
         </div>
-        <p className="text-amber-700 text-sm mt-3 font-bold text-center">📌 {config.pattern}</p>
+        <p className="text-amber-700 text-sm mt-3 font-bold text-center">📌 {formatText(config.pattern, numberSystem)}</p>
       </div>
     </div>
   );
@@ -338,19 +359,22 @@ function VisualSection({ num }: { num: number }) {
           <h3 className="text-xl font-black">{language === 'ar' ? `فهم ${formatNum(num, numberSystem)} × ${formatNum(b, numberSystem)} بالصور` : `${formatNum(num, numberSystem)} × ${formatNum(b, numberSystem)} Visual`}</h3>
         </div>
         <div className="p-6">
-          <div className="flex flex-col items-center gap-3 my-4">
-            {Array.from({ length: Math.min(num, 8) }, (_, r) => (
+          <div className="my-4">
+            {Array.from({ length: Math.min(num, 10) }, (_, r) => (
               <motion.div key={r} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: r * 0.12 }}
-                className="flex gap-1 justify-center flex-wrap">
-                {Array.from({ length: Math.min(b, 10) }, (_, c) => (
-                  <motion.span key={c} className="text-2xl md:text-3xl" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: r * 0.12 + c * 0.04 }}>
+                className="grid justify-center mb-1 mx-auto"
+                style={{ gridTemplateColumns: `repeat(${Math.min(b, 12)}, minmax(0, 1fr))`, maxWidth: `${Math.min(b, 12) * 2.5}rem` }}>
+                {Array.from({ length: Math.min(b, 12) }, (_, c) => (
+                  <motion.span key={c}
+                    className="text-center leading-none"
+                    style={{ fontSize: b <= 4 ? '1.75rem' : b <= 6 ? '1.5rem' : b <= 8 ? '1.25rem' : '1rem' }}
+                    initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: r * 0.12 + c * 0.04 }}>
                     {item.emoji}
                   </motion.span>
                 ))}
-                {b > 10 && <span className="text-2xl">...</span>}
               </motion.div>
             ))}
-            {num > 8 && <div className="text-gray-400 text-sm font-bold">... وأكثر</div>}
+            {num > 10 && <div className="text-gray-400 text-sm font-bold text-center">... {language === 'ar' ? 'وأكثر' : 'more'}</div>}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
             <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-4 text-center">
@@ -412,7 +436,7 @@ function WritingSection({ num }: { num: number }) {
         </div>
       </div>
       <div className="bg-amber-50 border-t px-5 py-3 flex items-center justify-between text-sm">
-        <span className="text-amber-700 font-bold">{correctCount} / 12</span>
+        <span className="text-amber-700 font-bold">{formatNum(correctCount, numberSystem)} / {formatNum(12, numberSystem)}</span>
         <button onClick={() => setAnswers({})} className="text-gray-500 hover:text-red-500 flex items-center gap-1"><RotateCcw className="w-3 h-3" /> إعادة</button>
       </div>
     </div>
@@ -457,10 +481,10 @@ function AdditionSection({ num }: { num: number }) {
         </div>
         <div className="text-center text-xl font-black text-gray-700 mb-4">{additions.map(v => formatNum(v, numberSystem)).join(' + ')} = ?</div>
         <div className="text-center text-3xl font-black text-green-700 mb-4">{formatEquation(num, b, NaN, numberSystem).replace(/NaN/, '?')}</div>
-        <div className="flex gap-3">
-          <input type="number" value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && check()} placeholder="؟" inputMode="numeric"
-            className={`flex-1 text-center text-2xl font-black border-2 rounded-xl py-3 focus:outline-none ${feedback === 'correct' ? 'border-green-400 bg-green-50 text-green-700' : feedback === 'wrong' ? 'border-red-300 bg-red-50 text-red-600' : 'border-green-300 focus:border-green-500'}`} />
-          <button onClick={check} className="bg-green-500 text-white font-black py-3 px-6 rounded-xl hover:bg-green-600 shadow-md">✓</button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <input type="text" value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && check()} placeholder="؟" inputMode="numeric"
+            className={`flex-1 text-center text-2xl font-black border-2 rounded-xl py-3 focus:outline-none min-w-0 ${feedback === 'correct' ? 'border-green-400 bg-green-50 text-green-700' : feedback === 'wrong' ? 'border-red-300 bg-red-50 text-red-600' : 'border-green-300 focus:border-green-500'}`} />
+          <button onClick={check} className="bg-green-500 text-white font-black py-3 px-6 rounded-xl hover:bg-green-600 shadow-md flex-shrink-0">✓</button>
         </div>
         <AnimatePresence>
           {feedback && (
@@ -471,7 +495,7 @@ function AdditionSection({ num }: { num: number }) {
           )}
         </AnimatePresence>
         <div className="flex justify-between mt-3 text-sm font-bold">
-          <span className="text-green-600">✅ {score}</span><span className="text-orange-500">🔥 {streak}</span>
+          <span className="text-green-600">✅ {formatNum(score, numberSystem)}</span><span className="text-orange-500">🔥 {streak}</span>
           <button onClick={() => { setB(Math.floor(Math.random() * 12) + 1); setAnswer(''); setFeedback(null); }} className="text-sky-500 hover:text-sky-700 flex items-center gap-1"><RotateCcw className="w-3 h-3" /> جديد</button>
         </div>
       </div>
@@ -509,20 +533,20 @@ function CommutativeSection({ num }: { num: number }) {
         <div className="grid grid-cols-2 gap-3">
           <div className={`rounded-2xl p-4 border-2 text-center ${checked && parseInt(ans1) === result ? 'border-green-400 bg-green-50' : 'border-sky-200 bg-sky-50'}`}>
             <div className="text-2xl font-black text-sky-700 mb-2">{formatEquation(num, b, NaN, numberSystem).replace(/NaN/, '')} =</div>
-            <input type="number" value={ans1} onChange={e => setAns1(e.target.value)} disabled={checked} className="w-16 text-center text-xl font-black border-2 border-sky-300 rounded-lg py-1 focus:outline-none" inputMode="numeric" />
+            <input type="text" value={ans1} onChange={e => setAns1(e.target.value)} disabled={checked} className="w-16 text-center text-xl font-black border-2 border-sky-300 rounded-lg py-1 focus:outline-none" inputMode="numeric" />
           </div>
           <div className={`rounded-2xl p-4 border-2 text-center ${checked && parseInt(ans2) === result ? 'border-green-400 bg-green-50' : 'border-pink-200 bg-pink-50'}`}>
             <div className="text-2xl font-black text-pink-600 mb-2">{formatEquation(b, num, NaN, numberSystem).replace(/NaN/, '')} =</div>
-            <input type="number" value={ans2} onChange={e => setAns2(e.target.value)} disabled={checked} className="w-16 text-center text-xl font-black border-2 border-pink-300 rounded-lg py-1 focus:outline-none" inputMode="numeric" />
+            <input type="text" value={ans2} onChange={e => setAns2(e.target.value)} disabled={checked} className="w-16 text-center text-xl font-black border-2 border-pink-300 rounded-lg py-1 focus:outline-none" inputMode="numeric" />
           </div>
         </div>
         {checked && <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 text-center font-black text-lg text-green-700">{formatEquation(num, b, result, numberSystem)} = {formatEquation(b, num, result, numberSystem)}</div>}
         {!checked ? (
-          <button onClick={check} disabled={!ans1 || !ans2} className="w-full bg-teal-500 text-white font-black py-3 rounded-xl hover:opacity-90 disabled:opacity-50">تحقق</button>
+          <button onClick={check} disabled={!ans1 || !ans2} className="w-full bg-teal-500 text-white font-black py-3 rounded-xl hover:opacity-90 disabled:opacity-50 whitespace-nowrap">تحقق</button>
         ) : (
           <button onClick={next} className="w-full bg-green-500 text-white font-black py-3 rounded-xl hover:bg-green-600 flex items-center justify-center gap-2"><RotateCcw className="w-4 h-4" /> جديد</button>
         )}
-        <div className="text-center text-sm font-bold text-teal-600">النقاط: {score}</div>
+        <div className="text-center text-sm font-bold text-teal-600">النقاط: {formatNum(score, numberSystem)}</div>
       </div>
     </div>
   );
@@ -561,20 +585,20 @@ function DivisionSection({ num }: { num: number }) {
         <div className="grid grid-cols-2 gap-3">
           <div className={`rounded-xl p-3 border-2 text-center ${checked && parseInt(answers.d1) === num ? 'border-green-400 bg-green-50' : 'border-sky-200'}`}>
             <p className="text-lg font-black text-sky-700">{formatNum(result, numberSystem)} ÷ {formatNum(b, numberSystem)} =</p>
-            <input type="number" value={answers.d1} onChange={e => setAnswers(a => ({ ...a, d1: e.target.value }))} disabled={checked} className="w-14 text-center text-xl font-black border-2 border-sky-300 rounded-lg py-1 focus:outline-none" inputMode="numeric" />
+            <input type="text" value={answers.d1} onChange={e => setAnswers(a => ({ ...a, d1: e.target.value }))} disabled={checked} className="w-14 text-center text-xl font-black border-2 border-sky-300 rounded-lg py-1 focus:outline-none" inputMode="numeric" />
           </div>
           <div className={`rounded-xl p-3 border-2 text-center ${checked && parseInt(answers.d2) === b ? 'border-green-400 bg-green-50' : 'border-pink-200'}`}>
             <p className="text-lg font-black text-pink-600">{formatNum(result, numberSystem)} ÷ {formatNum(num, numberSystem)} =</p>
-            <input type="number" value={answers.d2} onChange={e => setAnswers(a => ({ ...a, d2: e.target.value }))} disabled={checked} className="w-14 text-center text-xl font-black border-2 border-pink-300 rounded-lg py-1 focus:outline-none" inputMode="numeric" />
+            <input type="text" value={answers.d2} onChange={e => setAnswers(a => ({ ...a, d2: e.target.value }))} disabled={checked} className="w-14 text-center text-xl font-black border-2 border-pink-300 rounded-lg py-1 focus:outline-none" inputMode="numeric" />
           </div>
         </div>
         {checked && <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center text-green-700 font-bold">{formatNum(result, numberSystem)} ÷ {formatNum(b, numberSystem)} = {formatNum(num, numberSystem)} | {formatNum(result, numberSystem)} ÷ {formatNum(num, numberSystem)} = {formatNum(b, numberSystem)}</div>}
         {!checked ? (
-          <button onClick={check} className="w-full bg-orange-500 text-white font-black py-3 rounded-xl hover:bg-orange-600">تحقق</button>
+          <button onClick={check} className="w-full bg-orange-500 text-white font-black py-3 rounded-xl hover:bg-orange-600 whitespace-nowrap">تحقق</button>
         ) : (
           <button onClick={next} className="w-full bg-green-500 text-white font-black py-3 rounded-xl hover:bg-green-600 flex items-center justify-center gap-2"><RotateCcw className="w-4 h-4" /> جديد</button>
         )}
-        <div className="text-center text-sm font-bold text-orange-600">النقاط: {score}</div>
+        <div className="text-center text-sm font-bold text-orange-600">النقاط: {formatNum(score, numberSystem)}</div>
       </div>
     </div>
   );
@@ -745,8 +769,8 @@ function EqualProductsQuiz({ num }: { num: number }) {
         )}
 
         <div className="flex justify-between items-center mt-3 text-sm font-bold text-fuchsia-600">
-          <span>{language === 'ar' ? `النقاط: ${score}` : `Score: ${score}`}</span>
-          {totalAsked > 0 && <span>{language === 'ar' ? `أسئلة: ${totalAsked}` : `Questions: ${totalAsked}`}</span>}
+          <span>{language === 'ar' ? `النقاط: ${formatNum(score, numberSystem)}` : `Score: ${formatNum(score, numberSystem)}`}</span>
+          {totalAsked > 0 && <span>{language === 'ar' ? `أسئلة: ${formatNum(totalAsked, numberSystem)}` : `Questions: ${formatNum(totalAsked, numberSystem)}`}</span>}
         </div>
       </div>
     </div>
@@ -1208,11 +1232,11 @@ function CompleteActivity({ num, tableProducts, setActivityType }: { num: number
           {!checked ? (
             <div className="bg-violet-50 border-2 border-dashed border-violet-400 rounded-xl p-4">
               <div className="flex items-center justify-center gap-2">
-                <input type="number" value={answer1} onChange={e => setAnswer1(e.target.value)}
+                <input type="text" value={answer1} onChange={e => setAnswer1(e.target.value)}
                   className="w-14 text-center text-2xl font-black border-2 border-violet-300 rounded-lg py-2 focus:outline-none focus:border-violet-500"
                   placeholder="؟" maxLength={2} />
                 <span className="text-2xl font-black text-violet-600">×</span>
-                <input type="number" value={answer2} onChange={e => setAnswer2(e.target.value)}
+                <input type="text" value={answer2} onChange={e => setAnswer2(e.target.value)}
                   className="w-14 text-center text-2xl font-black border-2 border-violet-300 rounded-lg py-2 focus:outline-none focus:border-violet-500"
                   placeholder="؟" maxLength={2} />
                 <span className="text-2xl font-black text-violet-600">= {formatNum(target, numberSystem)}</span>
@@ -1452,8 +1476,8 @@ function DragDropActivity({ num, tableProducts, setActivityType }: { num: number
               <div className="text-3xl mb-2">{score === allEquations.length ? '🏆' : '⭐'}</div>
               <p className={`font-black text-lg ${score === allEquations.length ? 'text-green-600' : 'text-amber-600'}`}>
                 {language === 'ar'
-                  ? `${score} من ${allEquations.length} صحيحة`
-                  : `${score} of ${allEquations.length} correct`}
+                  ? `${formatNum(score, numberSystem)} من ${formatNum(allEquations.length, numberSystem)} صحيحة`
+                  : `${formatNum(score, numberSystem)} of ${formatNum(allEquations.length, numberSystem)} correct`}
               </p>
             </div>
           )}
@@ -1662,7 +1686,11 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
-  const [tfShown, setTfShown] = useState(() => questions[0].answer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 3) + 1));
+  const [tfShown, setTfShown] = useState(() => {
+    const r = Math.random();
+    if (r > 0.5) return questions[0].answer;
+    return questions[0].answer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 3) + 1);
+  });
 
   const handleMultipleChoice = (choice: number) => {
     if (feedback) return;
@@ -1695,7 +1723,12 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
   const advance = () => {
     if (idx < questions.length - 1) {
       setIdx(i => i + 1); setFillAnswer(''); setFeedback(null);
-      setTfShown(questions[idx + 1].answer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 3) + 1));
+      const nextAnswer = questions[idx + 1].answer;
+      if (Math.random() > 0.5) {
+        setTfShown(nextAnswer);
+      } else {
+        setTfShown(nextAnswer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 3) + 1));
+      }
     } else { setDone(true); addStars(score); }
   };
 
@@ -1707,7 +1740,7 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
       <div className="text-center py-8">
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-7xl mb-4">{passed ? '🏆' : score >= 5 ? '⭐' : '💪'}</motion.div>
         <h2 className="text-3xl font-black text-sky-700 mb-2">{passed ? 'أحسنت! تجاوزت الاختبار!' : 'انتهى الاختبار'}</h2>
-        <p className="text-xl font-bold text-gray-600 mb-2">{score} / 10</p>
+        <p className="text-xl font-bold text-gray-600 mb-2">{formatNum(score, numberSystem)} / {formatNum(10, numberSystem)}</p>
         <p className={`text-sm font-bold ${passed ? 'text-green-600' : 'text-red-500'}`}>{passed ? '✅ نجحت! (80%+ مطلوب)' : '❌ تحتاج 80% - حاول مرة أخرى!'}</p>
         <button onClick={() => { setIdx(0); setScore(0); setDone(false); setFeedback(null); setFillAnswer(''); }}
           className="mt-4 bg-sky-500 text-white font-bold py-3 px-8 rounded-xl hover:bg-sky-600 flex items-center gap-2 mx-auto"><RotateCcw className="w-4 h-4" /> حاول مرة أخرى</button>
@@ -1722,7 +1755,7 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
           <button key={t.id} onClick={() => setQuizType(t.id)} className={`flex-1 py-2 rounded-xl font-bold text-sm transition-all ${quizType === t.id ? 'bg-white shadow-md text-sky-700' : 'text-gray-600'}`}>{t.l}</button>
         ))}
       </div>
-      <div className="flex items-center justify-between mb-2 text-sm font-bold"><span className="text-gray-500">{idx + 1} / 10</span><span className="text-yellow-600 flex items-center gap-1"><Star className="w-4 h-4 fill-yellow-400" />{score}</span></div>
+      <div className="flex items-center justify-between mb-2 text-sm font-bold"><span className="text-gray-500">{formatNum(idx + 1, numberSystem)} / {formatNum(10, numberSystem)}</span><span className="text-yellow-600 flex items-center gap-1"><Star className="w-4 h-4 fill-yellow-400" />{formatNum(score, numberSystem)}</span></div>
       <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden mb-4"><div className="h-full bg-sky-400 rounded-full transition-all" style={{ width: `${(idx / 10) * 100}%` }} /></div>
       <motion.div key={idx} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
         {quizType === 'multiple' && (
@@ -1750,10 +1783,10 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
         {quizType === 'fill' && (
           <>
             <div className="text-4xl md:text-5xl font-black text-sky-700 text-center mb-6">{formatEquation(num, idx + 1, NaN, numberSystem).replace(/NaN/, '?')}</div>
-            <div className="flex gap-3">
-              <input type="number" value={fillAnswer} onChange={e => setFillAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleFill()} placeholder="؟" inputMode="numeric"
-                className={`flex-1 text-center text-3xl font-black border-2 rounded-xl py-3 focus:outline-none ${feedback === 'correct' ? 'border-green-400 bg-green-50 text-green-700' : feedback === 'wrong' ? 'border-red-300 bg-red-50 text-red-600' : 'border-sky-300 focus:border-sky-500'}`} />
-              <button onClick={handleFill} className="bg-sky-500 text-white font-black py-3 px-6 rounded-xl hover:bg-sky-600">✓</button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input type="text" value={fillAnswer} onChange={e => setFillAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleFill()} placeholder="؟" inputMode="numeric"
+                className={`flex-1 text-center text-3xl font-black border-2 rounded-xl py-3 focus:outline-none min-w-0 ${feedback === 'correct' ? 'border-green-400 bg-green-50 text-green-700' : feedback === 'wrong' ? 'border-red-300 bg-red-50 text-red-600' : 'border-sky-300 focus:border-sky-500'}`} />
+              <button onClick={handleFill} className="bg-sky-500 text-white font-black py-3 px-6 rounded-xl hover:bg-sky-600 flex-shrink-0">✓</button>
             </div>
             <div className="grid grid-cols-5 gap-2 mt-3">
               {[1,2,3,4,5,6,7,8,9,0].map(n => (
@@ -2055,7 +2088,10 @@ function ExportSection({ num }: { num: number }) {
         if (i > 0) pdf.addPage();
         pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM);
       });
-      pdf.save(`table-${num}-${wsType}.pdf`);
+      const pdfData = pdf.output('datauristring');
+      await saveFileNative(pdfData, `table-${num}-${wsType}.pdf`);
+    } catch (e) {
+      console.error('PDF export error:', e);
     } finally {
       setExporting(false);
     }
@@ -2065,14 +2101,16 @@ function ExportSection({ num }: { num: number }) {
     setExporting(true);
     try {
       const pages = await captureWorksheetPages(wsType, num);
-      pages.forEach((canvas, i) => {
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL(`image/${format}`, 0.95);
-        link.download = pages.length > 1
+      for (let i = 0; i < pages.length; i++) {
+        const canvas = pages[i];
+        const dataUrl = canvas.toDataURL(`image/${format}`, 0.95);
+        const filename = pages.length > 1
           ? `table-${num}-${wsType}-page${i + 1}.${format}`
           : `table-${num}-${wsType}.${format}`;
-        link.click();
-      });
+        await saveFileNative(dataUrl, filename);
+      }
+    } catch (e) {
+      console.error('Image export error:', e);
     } finally {
       setExporting(false);
     }
@@ -2436,7 +2474,7 @@ export default function TablePageClient({ num }: { num: number }) {
           <div className="relative">
             <div className="text-5xl mb-2">{config.animal}</div>
             <h1 className="text-4xl md:text-5xl font-black mb-2">{language === 'ar' ? `جدول الضرب في ${formatNum(num, numberSystem)}` : `Table of ${formatNum(num, numberSystem)}`}</h1>
-            <p className="text-white/80 text-lg">{config.tip}</p>
+            <p className="text-white/80 text-lg">{formatText(config.tip, numberSystem)}</p>
             <div className="mt-4 flex items-center justify-center gap-4 flex-wrap">
               {mastery > 0 && <div className="bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 flex items-center gap-2"><Star className="w-4 h-4 text-yellow-300 fill-yellow-200" /><span className="font-bold">{language === 'ar' ? 'الإتقان' : 'Mastery'}: {formatNum(mastery, numberSystem)}%</span></div>}
               {quizPassed && <div className="bg-yellow-400/30 backdrop-blur-sm rounded-full px-4 py-1.5 flex items-center gap-2"><Trophy className="w-4 h-4 text-yellow-200" /><span className="font-bold">{language === 'ar' ? 'تم النجاح!' : 'Passed!'}</span></div>}
@@ -2502,7 +2540,7 @@ export default function TablePageClient({ num }: { num: number }) {
             <div className="mt-6 bg-white rounded-2xl p-4 shadow-md border border-sky-100">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-bold text-gray-600">{language === 'ar' ? 'تقدمك في الجدول' : 'Progress'}</span>
-                <span className="text-sm font-bold text-sky-600">{completedSections.size} / {SECTIONS.length}</span>
+                <span className="text-sm font-bold text-sky-600">{formatNum(completedSections.size, numberSystem)} / {formatNum(SECTIONS.length, numberSystem)}</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
                 <div className={`h-full bg-gradient-to-r ${config.gradient} rounded-full transition-all`} style={{ width: `${(completedSections.size / SECTIONS.length) * 100}%` }} />

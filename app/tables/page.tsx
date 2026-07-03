@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useStudent } from '@/lib/student-context';
+import { useSettings } from '@/lib/settings-context';
+import { formatNum } from '@/lib/numerals';
 import { Star, Lock } from 'lucide-react';
 
 const TABLE_INFO = [
@@ -22,6 +24,7 @@ const TABLE_INFO = [
 
 export default function TablesPage() {
   const { tableProgress } = useStudent();
+  const { numberSystem } = useSettings();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50 to-white">
@@ -44,15 +47,15 @@ export default function TablesPage() {
                     <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${info.color}`} />
                     <div className="text-3xl mb-2 text-center">{info.emoji}</div>
                     <div className="text-center">
-                      <span className={`text-4xl font-black bg-gradient-to-r ${info.color} bg-clip-text text-transparent`}>{info.num}</span>
+                      <span className={`text-4xl font-black bg-gradient-to-r ${info.color} bg-clip-text text-transparent`}>{formatNum(info.num, numberSystem)}</span>
                     </div>
-                    <p className="text-center text-gray-600 font-bold text-sm mt-1">جدول {info.num}</p>
+                    <p className="text-center text-gray-600 font-bold text-sm mt-1">جدول {formatNum(info.num, numberSystem)}</p>
 
                     {mastery > 0 ? (
                       <div className="mt-3">
                         <div className="flex justify-between text-xs font-bold mb-1">
                           <span className="text-gray-500">الإتقان</span>
-                          <span className={mastery >= 80 ? 'text-green-600' : 'text-yellow-600'}>{mastery}%</span>
+                          <span className={mastery >= 80 ? 'text-green-600' : 'text-yellow-600'}>{formatNum(mastery, numberSystem)}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div className={`h-2 rounded-full bg-gradient-to-r ${info.color}`} style={{ width: `${mastery}%` }} />
@@ -81,7 +84,7 @@ export default function TablesPage() {
               <div key={info.num} className={`${info.bg} ${info.border} border rounded-xl p-4 flex items-start gap-3`}>
                 <span className="text-2xl flex-shrink-0">{info.emoji}</span>
                 <div>
-                  <span className={`font-black bg-gradient-to-r ${info.color} bg-clip-text text-transparent`}>جدول {info.num}: </span>
+                  <span className={`font-black bg-gradient-to-r ${info.color} bg-clip-text text-transparent`}>جدول {formatNum(info.num, numberSystem)}: </span>
                   <span className="text-gray-600 text-sm">{info.tip}</span>
                 </div>
               </div>

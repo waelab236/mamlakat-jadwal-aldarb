@@ -84,7 +84,7 @@ export default function DivisionPage() {
                   <div className={`flex-1 flex items-center gap-2 bg-sky-50 border-2 rounded-xl p-4 ${checked ? parseInt(answers.div1) === fact.a ? 'border-green-400' : 'border-red-300' : 'border-sky-200'}`}>
                     <span className="text-xl font-black text-sky-700 flex-1 text-center">{formatNum(fact.result, numberSystem)} ÷ {formatNum(fact.b, numberSystem)} =</span>
                     <input
-                      type="number"
+                      type="text"
                       value={answers.div1}
                       onChange={e => setAnswers(a => ({ ...a, div1: e.target.value }))}
                       disabled={checked}
@@ -101,7 +101,7 @@ export default function DivisionPage() {
                   <div className={`flex-1 flex items-center gap-2 bg-pink-50 border-2 rounded-xl p-4 ${checked ? parseInt(answers.div2) === fact.b ? 'border-green-400' : 'border-red-300' : 'border-pink-200'}`}>
                     <span className="text-xl font-black text-pink-700 flex-1 text-center">{formatNum(fact.result, numberSystem)} ÷ {formatNum(fact.a, numberSystem)} =</span>
                     <input
-                      type="number"
+                      type="text"
                       value={answers.div2}
                       onChange={e => setAnswers(a => ({ ...a, div2: e.target.value }))}
                       disabled={checked}

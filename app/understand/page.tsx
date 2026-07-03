@@ -30,14 +30,19 @@ function VisualMultiplication({ rows, cols, item }: { rows: number; cols: number
         <div className="text-4xl font-black text-sky-700 mb-1">
           {formatNum(rows, numberSystem)} × {formatNum(cols, numberSystem)} = <span className={`text-green-600 transition-all ${revealed ? 'opacity-100' : 'opacity-0'}`}>{formatNum(rows * cols, numberSystem)}</span>
         </div>
-        <p className="text-gray-500 text-sm">{rows} مجموعات من {cols} {item.name}</p>
+        <p className="text-gray-500 text-sm">{formatNum(rows, numberSystem)} مجموعات من {formatNum(cols, numberSystem)} {item.name}</p>
       </div>
 
-      <div className="flex flex-col items-center gap-2 my-6">
+      <div className="my-6">
         {Array.from({ length: rows }, (_, r) => (
-          <motion.div key={r} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: r * 0.15 }} className="flex gap-1 justify-center flex-wrap">
+          <motion.div key={r} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: r * 0.15 }}
+            className="grid justify-center mb-1"
+            style={{ gridTemplateColumns: `repeat(${Math.min(cols, 10)}, minmax(0, 1fr))`, maxWidth: `${Math.min(cols, 10) * 3}rem`, margin: '0 auto' }}>
             {Array.from({ length: cols }, (_, c) => (
-              <motion.span key={c} className="text-2xl md:text-3xl" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: r * 0.15 + c * 0.05 }}>
+              <motion.span key={c}
+                className="text-center leading-none"
+                style={{ fontSize: cols <= 4 ? '1.75rem' : cols <= 6 ? '1.5rem' : cols <= 8 ? '1.25rem' : '1rem' }}
+                initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: r * 0.15 + c * 0.05 }}>
                 {item.emoji}
               </motion.span>
             ))}

@@ -109,7 +109,7 @@ export default function ExercisesPage() {
                 {/* Answer Input */}
                 <div className="flex gap-3 items-center">
                   <input
-                    type="number"
+                    type="text"
                     value={answer}
                     onChange={e => setAnswer(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSubmit()}
@@ -119,9 +119,8 @@ export default function ExercisesPage() {
                       feedback === 'wrong' ? 'border-red-300 bg-red-50 text-red-600' :
                       'border-sky-300 focus:border-sky-500 bg-white'
                     }`}
-                    inputMode="numeric"
                   />
-                  <button onClick={handleSubmit} className="bg-sky-500 text-white font-black py-3 px-6 rounded-xl hover:bg-sky-600 transition-all shadow-md">
+                  <button onClick={handleSubmit} className="bg-sky-500 text-white font-black py-3 px-6 rounded-xl hover:bg-sky-600 transition-all shadow-md flex-shrink-0 whitespace-nowrap">
                     تحقق
                   </button>
                 </div>

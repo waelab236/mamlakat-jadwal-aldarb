@@ -4,10 +4,13 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudent } from '@/lib/student-context';
 import { useSettings } from '@/lib/settings-context';
-import { formatNum } from '@/lib/numerals';
+import { formatNum, formatText } from '@/lib/numerals';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Printer, RefreshCw, Download, FileText, Star, FileDown } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 type QuestionType = 'fill' | 'multiple' | 'matching' | 'true_false';
@@ -28,8 +31,9 @@ function generateWorksheetQuestions(tables: number[], difficulty: Difficulty, ty
 
 const DECORATIONS = ['🌸', '⭐', '🌟', '🦋', '🌺', '🐝', '🌻', '🎀', '🌈', '🐱', '🌷', '✨'];
 
-function WorksheetPreview({ config }: {
+function WorksheetPreview({ config, numberSystem }: {
   config: { tables: number[]; difficulty: Difficulty; studentName: string; teacherName: string; schoolName: string; title: string };
+  numberSystem: 'western' | 'arabic';
 }) {
   const questions = generateWorksheetQuestions(config.tables, config.difficulty, ['fill']);
   const cols = 2;
@@ -48,7 +52,7 @@ function WorksheetPreview({ config }: {
           <div className="flex justify-between mt-3 text-sm">
             <div>الاسم: <span className="font-bold">{config.studentName || '________________'}</span></div>
             <div>التاريخ: ________________</div>
-            <div>الدرجة: __ / {questions.length}</div>
+            <div>الدرجة: __ / {formatNum(questions.length, numberSystem)}</div>
           </div>
           {config.teacherName && <div className="text-blue-100 text-sm mt-1">المعلم: {config.teacherName}</div>}
         </div>
@@ -63,8 +67,8 @@ function WorksheetPreview({ config }: {
         <div className="grid grid-cols-2 gap-x-8 gap-y-4">
           {questions.map((q, i) => (
             <div key={i} className="flex items-center gap-2">
-              <span className="text-sky-600 font-black text-sm w-6 flex-shrink-0">{typeof formatNum === 'function' ? formatNum(i + 1, 'western') : i + 1}.</span>
-              <span className="text-gray-800 font-black text-lg">{q.q}</span>
+              <span className="text-sky-600 font-black text-sm w-6 flex-shrink-0">{typeof formatNum === 'function' ? formatNum(i + 1, numberSystem) : i + 1}.</span>
+              <span className="text-gray-800 font-black text-lg">{formatText(q.q, numberSystem)}</span>
             </div>
           ))}
         </div>
@@ -78,6 +82,38 @@ function WorksheetPreview({ config }: {
       </div>
     </div>
   );
+}
+
+
+async function saveFile(dataUrl: string, filename: string) {
+  if (Capacitor.isNativePlatform()) {
+    const base64Data = dataUrl.split(',')[1];
+    const fileName = filename.replace(/[^a-zA-Z0-9.\-]/g, '_');
+    try {
+      const result = await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+      await Share.share({
+        title: filename,
+        url: result.uri,
+        dialogTitle: 'حفظ أو مشاركة الملف',
+      });
+    } catch (e) {
+      console.error('Filesystem error:', e);
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = filename;
+      link.click();
+    }
+  } else {
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = filename;
+    link.click();
+  }
 }
 
 export default function WorksheetsPage() {
@@ -127,22 +163,31 @@ export default function WorksheetsPage() {
 
   const exportPDF = async () => {
     if (!previewRef.current) return;
-    const canvas = await html2canvas(previewRef.current, { scale: 2, backgroundColor: '#ffffff' });
-    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-    const imgData = canvas.toDataURL('image/png');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
-    pdf.save(`${title || 'worksheet'}.pdf`);
+    try {
+      const canvas = await html2canvas(previewRef.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+      const imgData = canvas.toDataURL('image/png');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+      const pdfData = pdf.output('datauristring');
+      await saveFile(pdfData, `${title || 'worksheet'}.pdf`);
+    } catch (e) {
+      console.error('PDF export error:', e);
+      alert('تعذر تصدير PDF');
+    }
   };
 
   const exportImage = async (format: 'png' | 'jpg') => {
     if (!previewRef.current) return;
-    const canvas = await html2canvas(previewRef.current, { scale: 2, backgroundColor: '#ffffff' });
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL(`image/${format}`);
-    link.download = `${title || 'worksheet'}.${format}`;
-    link.click();
+    try {
+      const canvas = await html2canvas(previewRef.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+      const dataUrl = canvas.toDataURL(`image/${format}`);
+      await saveFile(dataUrl, `${title || 'worksheet'}.${format}`);
+    } catch (e) {
+      console.error('Image export error:', e);
+      alert('تعذر تصدير الصورة');
+    }
   };
 
   const config = { tables, difficulty, studentName, teacherName, schoolName, title };
@@ -226,7 +271,7 @@ export default function WorksheetsPage() {
             {generated ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                 <div ref={previewRef}>
-                  <WorksheetPreview key={key} config={config} />
+                  <WorksheetPreview key={key} config={config} numberSystem={numberSystem} />
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-4">
                   <button onClick={handlePrint} className="flex items-center justify-center gap-2 bg-sky-500 text-white font-bold py-3 rounded-xl hover:bg-sky-600 shadow-md text-sm">
