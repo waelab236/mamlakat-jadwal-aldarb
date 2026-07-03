@@ -36,12 +36,11 @@ function VisualMultiplication({ rows, cols, item }: { rows: number; cols: number
       <div className="my-6 overflow-hidden">
         {Array.from({ length: rows }, (_, r) => (
           <motion.div key={r} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: r * 0.15 }}
-            className="grid justify-center mb-1 mx-auto w-full"
-            style={{ gridTemplateColumns: `repeat(${Math.min(cols, 10)}, minmax(0, 1fr))`, maxWidth: '100%' }}>
+            className="flex flex-wrap justify-center gap-0.5 mb-1 mx-auto w-full">
             {Array.from({ length: cols }, (_, c) => (
               <motion.span key={c}
-                className="text-center leading-none"
-                style={{ fontSize: cols <= 3 ? '2rem' : cols <= 5 ? '1.5rem' : cols <= 7 ? '1.25rem' : cols <= 9 ? '1rem' : '0.75rem' }}
+                className="text-center leading-none flex-shrink-0"
+                style={{ fontSize: `clamp(0.6rem, ${Math.floor(100 / cols)}vw, ${cols <= 3 ? '2rem' : cols <= 5 ? '1.5rem' : cols <= 7 ? '1.25rem' : cols <= 9 ? '1rem' : '0.75rem'})` }}
                 initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: r * 0.15 + c * 0.05 }}>
                 {item.emoji}
               </motion.span>
@@ -50,9 +49,9 @@ function VisualMultiplication({ rows, cols, item }: { rows: number; cols: number
         ))}
       </div>
 
-      <div className="bg-sky-50 rounded-2xl p-4 border border-sky-200">
+      <div className="bg-sky-50 rounded-2xl p-4 border border-sky-200 overflow-hidden">
         <p className="text-center text-sky-700 font-bold text-lg mb-2">الجمع المتكرر:</p>
-        <p className="text-center text-gray-700 font-black text-xl">
+        <p className="text-center text-gray-700 font-black text-base sm:text-xl break-all">
           {Array.from({ length: rows }, () => formatNum(cols, numberSystem)).join(' + ')} = {formatNum(rows * cols, numberSystem)}
         </p>
       </div>

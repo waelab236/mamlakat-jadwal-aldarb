@@ -30,17 +30,40 @@ async function saveFileNative(dataUrl: string, filename: string) {
     const commaIdx = dataUrl.indexOf(',');
     const base64Data = commaIdx >= 0 ? dataUrl.substring(commaIdx + 1) : dataUrl;
     try {
+      // Try Documents directory first
       const result = await Filesystem.writeFile({
         path: safeName, data: base64Data, directory: Directory.Documents, recursive: true,
       });
       await Share.share({ title: filename, url: result.uri, dialogTitle: 'حفظ أو مشاركة' });
     } catch (e) {
-      console.error('Filesystem error:', e);
-      // Fallback: open in new window for manual save
-      const blob = await (await fetch(dataUrl)).blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      console.error('Filesystem Documents error, trying Cache:', e);
+      try {
+        // Fallback: use Cache directory
+        const result = await Filesystem.writeFile({
+          path: safeName, data: base64Data, directory: Directory.Cache, recursive: true,
+        });
+        await Share.share({ title: filename, url: result.uri, dialogTitle: 'حفظ أو مشاركة' });
+      } catch (e2) {
+        console.error('Filesystem Cache error, trying Data:', e2);
+        try {
+          // Fallback 2: use Data directory
+          const result = await Filesystem.writeFile({
+            path: safeName, data: base64Data, directory: Directory.Data, recursive: true,
+          });
+          await Share.share({ title: filename, url: result.uri, dialogTitle: 'حفظ أو مشاركة' });
+        } catch (e3) {
+          console.error('All Filesystem writes failed:', e3);
+          // Final fallback: open in new window
+          try {
+            const blob = await (await fetch(dataUrl)).blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          } catch (e4) {
+            console.error('Fallback save error:', e4);
+          }
+        }
+      }
     }
   } else {
     const link = document.createElement('a'); link.href = dataUrl; link.download = filename; link.click();
@@ -381,12 +404,11 @@ function VisualSection({ num }: { num: number }) {
           <div className="my-4 overflow-hidden">
             {Array.from({ length: Math.min(num, 10) }, (_, r) => (
               <motion.div key={r} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: r * 0.12 }}
-                className="grid justify-center mb-1 mx-auto w-full"
-                style={{ gridTemplateColumns: `repeat(${Math.min(b, 12)}, minmax(0, 1fr))`, maxWidth: '100%' }}>
+                className="flex flex-wrap justify-center gap-0.5 mb-1 mx-auto w-full">
                 {Array.from({ length: Math.min(b, 12) }, (_, c) => (
                   <motion.span key={c}
-                    className="text-center leading-none"
-                    style={{ fontSize: b <= 3 ? '2rem' : b <= 5 ? '1.5rem' : b <= 7 ? '1.25rem' : b <= 9 ? '1rem' : '0.75rem' }}
+                    className="text-center leading-none flex-shrink-0"
+                    style={{ fontSize: `clamp(0.5rem, ${Math.floor(100 / Math.min(b, 12))}vw, ${b <= 3 ? '2rem' : b <= 5 ? '1.5rem' : b <= 7 ? '1.25rem' : b <= 9 ? '1rem' : '0.75rem'})` }}
                     initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: r * 0.12 + c * 0.04 }}>
                     {item.emoji}
                   </motion.span>
@@ -398,7 +420,7 @@ function VisualSection({ num }: { num: number }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
             <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-4 text-center">
               <p className="text-sky-700 font-bold text-sm mb-1">{language === 'ar' ? 'الجمع المتكرر' : 'Repeated Addition'}</p>
-              <p className="text-lg font-black text-sky-800">{Array.from({ length: Math.min(num, 6) }, () => formatNum(b, numberSystem)).join(' + ')}{num > 6 ? ' + ...' : ''} = <span className="text-green-600">{formatNum(result, numberSystem)}</span></p>
+              <p className="text-sm sm:text-lg font-black text-sky-800 break-all">{Array.from({ length: Math.min(num, 6) }, () => formatNum(b, numberSystem)).join(' + ')}{num > 6 ? ' + ...' : ''} = <span className="text-green-600">{formatNum(result, numberSystem)}</span></p>
             </div>
             <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 text-center">
               <p className="text-green-700 font-bold text-sm mb-1">{language === 'ar' ? 'الضرب' : 'Multiplication'}</p>
@@ -428,18 +450,19 @@ function VisualSection({ num }: { num: number }) {
 function WritingSection({ num }: { num: number }) {
   const { numberSystem, language } = useSettings();
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const facts = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) }));
-
-  // Fisher-Yates shuffle for randomizing worksheet questions
-  function shuffleArray<T>(arr: T[]): T[] {
-    const a = [...arr];
-    for (let i = a.length - 1; i > 0; i--) {
+  const [facts] = useState(() => {
+    const arr = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) }));
+    for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
+      [arr[i], arr[j]] = [arr[j], arr[i]];
     }
-    return a;
-  }
-  const correctCount = Object.keys(answers).filter(k => answers[k]?.trim() === facts[parseInt(k) - 1]?.result?.toString()).length;
+    return arr;
+  });
+
+  const correctCount = Object.keys(answers).filter(k => {
+    const fact = facts.find(f => f.b === parseInt(k));
+    return answers[k]?.trim() === fact?.result?.toString();
+  }).length;
 
   return (
     <div className="bg-white rounded-3xl shadow-xl border-2 border-yellow-200 overflow-hidden">
@@ -502,13 +525,13 @@ function AdditionSection({ num }: { num: number }) {
         <h3 className="text-xl font-black">{language === 'ar' ? 'الجمع المتكرر' : 'Repeated Addition'}</h3>
       </div>
       <div className="p-5">
-        <div className="flex flex-wrap gap-2 justify-center mb-4">
+        <div className="flex flex-wrap gap-1.5 justify-center mb-4">
           {additions.map((val, i) => (
             <motion.div key={`${b}-${i}`} initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: i * 0.06 }}
-              className="bg-green-400 text-white w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl shadow-md">{formatNum(val, numberSystem)}</motion.div>
+              className="bg-green-400 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-black text-base sm:text-xl shadow-md flex-shrink-0">{formatNum(val, numberSystem)}</motion.div>
           ))}
         </div>
-        <div className="text-center text-xl font-black text-gray-700 mb-4">{additions.map(v => formatNum(v, numberSystem)).join(' + ')} = ?</div>
+        <div className="text-center text-base sm:text-xl font-black text-gray-700 mb-4 break-all">{additions.map(v => formatNum(v, numberSystem)).join(' + ')} = ?</div>
         <div className="text-center text-3xl font-black text-green-700 mb-4">{formatEquation(num, b, NaN, numberSystem).replace(/NaN/, '?')}</div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input type="text" value={answer} onChange={e => setAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && check()} placeholder="؟" inputMode="numeric"
@@ -1706,10 +1729,17 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
   const { numberSystem, language } = useSettings();
   const { updateTableProgress, addStars } = useStudent();
   const [quizType, setQuizType] = useState<'multiple' | 'truefalse' | 'fill'>('multiple');
-  const [questions] = useState(() => Array.from({ length: 10 }, (_, i) => {
-    const b = i + 1; const r = num * b;
-    return { q: `${num} × ${b}`, answer: r, choices: generateChoices(r) };
-  }));
+  const [questions] = useState(() => {
+    const arr = Array.from({ length: 10 }, (_, i) => {
+      const b = i + 1; const r = num * b;
+      return { q: `${num} × ${b}`, answer: r, choices: generateChoices(r) };
+    });
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  });
   const [idx, setIdx] = useState(0);
   const [fillAnswer, setFillAnswer] = useState('');
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
@@ -2054,7 +2084,8 @@ function ExportSection({ num }: { num: number }) {
   };
 
   // Render worksheet HTML off-screen, capture full height, return array of A4-page canvases
-  // DOM-aware pagination: measures each card and splits at card boundaries
+  // DOM-aware pagination: measures each card's position and groups cards into pages.
+  // No card is ever split. No blank pages. All content is rendered.
   const captureWorksheetPages = async (type: string, tableNum: number): Promise<HTMLCanvasElement[]> => {
     const htmlContent = createA4WorksheetHTML(type, tableNum);
 
@@ -2063,7 +2094,7 @@ function ExportSection({ num }: { num: number }) {
     iframe.style.top = '0';
     iframe.style.left = '-10000px';
     iframe.style.width = `${A4_PX_W}px`;
-    iframe.style.height = `${A4_PX_H * 6}px`;
+    iframe.style.height = `${A4_PX_H * 8}px`;
     iframe.style.border = 'none';
     iframe.style.visibility = 'hidden';
     document.body.appendChild(iframe);
@@ -2076,12 +2107,11 @@ function ExportSection({ num }: { num: number }) {
     iframeDoc.close();
 
     // Wait for fonts / layout
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 600));
 
     const pageEl = iframeDoc.querySelector('.page') as HTMLElement;
     if (!pageEl) { document.body.removeChild(iframe); return []; }
 
-    // Measure the header and footer heights (shared on every page)
     const headerEl = iframeDoc.querySelector('.header') as HTMLElement;
     const decorEl = iframeDoc.querySelector('.decor-bar') as HTMLElement;
     const footerEl = iframeDoc.querySelector('.footer') as HTMLElement;
@@ -2089,61 +2119,36 @@ function ExportSection({ num }: { num: number }) {
 
     if (!contentEl || !headerEl) { document.body.removeChild(iframe); return []; }
 
-    const pagePadding = 50 + 60; // top + bottom padding from .page CSS
-    const headerHeight = headerEl.offsetHeight + 18 + (decorEl?.offsetHeight || 0) + 16; // header + margin + decor + margin
-    const footerHeight = (footerEl?.offsetHeight || 0) + 20; // footer + margin-top
-    const usableHeight = A4_PX_H - pagePadding - headerHeight - footerHeight;
+    // Measure fixed elements
+    const pageStyle = iframeDoc.defaultView!.getComputedStyle(pageEl);
+    const paddingTop = parseFloat(pageStyle.paddingTop) || 50;
+    const paddingBottom = parseFloat(pageStyle.paddingBottom) || 60;
+    const headerH = headerEl.offsetHeight + 18 + (decorEl?.offsetHeight || 0) + 16;
+    const footerH = (footerEl?.offsetHeight || 0) + 20;
+    const usableH = A4_PX_H - paddingTop - paddingBottom - headerH - footerH;
 
-    // Get all card elements (direct children of .content)
+    // Get all direct children of .content (these are the cards/sections)
     const cards = Array.from(contentEl.children) as HTMLElement[];
-    if (cards.length === 0) {
-      // Single-section worksheets (assessment) — capture as one page
-      const fullCanvas = await html2canvas(pageEl, {
-        scale: 2, width: A4_PX_W, useCORS: true, backgroundColor: '#ffffff',
-        logging: false, windowWidth: A4_PX_W, scrollX: 0, scrollY: 0,
-      });
-      document.body.removeChild(iframe);
-      const pageHeightPx = A4_PX_H * 2;
-      if (fullCanvas.height <= pageHeightPx) {
-        return [fullCanvas];
-      }
-      // Fallback: slice but avoid blank pages
-      const totalPages = Math.ceil(fullCanvas.height / pageHeightPx);
-      const pages: HTMLCanvasElement[] = [];
-      for (let p = 0; p < totalPages; p++) {
-        const pageCanvas = document.createElement('canvas');
-        pageCanvas.width = fullCanvas.width;
-        pageCanvas.height = pageHeightPx;
-        const ctx = pageCanvas.getContext('2d')!;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        const srcH = Math.min(pageHeightPx, fullCanvas.height - p * pageHeightPx);
-        if (srcH > 0) {
-          ctx.drawImage(fullCanvas, 0, p * pageHeightPx, fullCanvas.width, srcH, 0, 0, fullCanvas.width, srcH);
-          pages.push(pageCanvas);
-        }
-      }
-      return pages;
-    }
 
-    // Group cards into pages based on their heights
+    // Group cards into pages
     const pageGroups: HTMLElement[][] = [];
     let currentGroup: HTMLElement[] = [];
-    let currentHeight = 0;
+    let currentH = 0;
 
     for (const card of cards) {
-      const cardHeight = card.offsetHeight + 12; // + margin-bottom
-      if (currentHeight + cardHeight > usableHeight && currentGroup.length > 0) {
+      const cardH = card.offsetHeight + 12; // margin-bottom
+      // If this card alone is taller than usableH, it still goes on its own page
+      if (currentH + cardH > usableH && currentGroup.length > 0) {
         pageGroups.push(currentGroup);
         currentGroup = [];
-        currentHeight = 0;
+        currentH = 0;
       }
       currentGroup.push(card);
-      currentHeight += cardHeight;
+      currentH += cardH;
     }
     if (currentGroup.length > 0) pageGroups.push(currentGroup);
 
-    // For each page group, build a complete page HTML and capture it
+    // For each page group, build a complete A4 page HTML and capture it
     const pages: HTMLCanvasElement[] = [];
     const headerHTML = headerEl.outerHTML;
     const decorHTML = decorEl?.outerHTML || '';
@@ -2157,8 +2162,14 @@ function ExportSection({ num }: { num: number }) {
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
           html, body { width: ${A4_PX_W}px; background: #ffffff; direction: rtl; }
-          .page { width: ${A4_PX_W}px; min-height: ${A4_PX_H}px; padding: 50px 56px 60px; background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 60%, #f0fdf4 100%); }
+          .page { width: ${A4_PX_W}px; min-height: ${A4_PX_H}px; padding: ${paddingTop}px 56px ${paddingBottom}px; background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 60%, #f0fdf4 100%); }
+          .header { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 55%, #7c3aed 100%); color: white; padding: 18px 24px; border-radius: 20px; margin-bottom: 18px; box-shadow: 0 6px 18px rgba(59,130,246,0.35); }
+          .title { font-size: 30px; font-weight: 900; text-align: center; margin-bottom: 12px; }
+          .info-row { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 15px; padding: 10px 14px; background: rgba(255,255,255,0.18); border-radius: 12px; }
+          .decor-bar { text-align: center; font-size: 20px; margin-bottom: 16px; opacity: 0.7; letter-spacing: 6px; }
+          .content { width: 100%; }
           .content > div { break-inside: avoid; page-break-inside: avoid; }
+          .footer { border-top: 3px dashed #93c5fd; padding-top: 10px; margin-top: 20px; display: flex; justify-content: space-between; font-size: 13px; color: #6b7280; }
         </style></head><body>
         <div class="page">
           ${headerHTML}
@@ -2182,16 +2193,16 @@ function ExportSection({ num }: { num: number }) {
       pageDoc.open();
       pageDoc.write(pageHTML);
       pageDoc.close();
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400));
 
       const pageDiv = pageDoc.querySelector('.page') as HTMLElement;
       if (pageDiv) {
         const canvas = await html2canvas(pageDiv, {
-          scale: 2, width: A4_PX_W, useCORS: true, backgroundColor: '#ffffff',
+          scale: 2, width: A4_PX_W, height: A4_PX_H, useCORS: true, backgroundColor: '#ffffff',
           logging: false, windowWidth: A4_PX_W, scrollX: 0, scrollY: 0,
         });
-        // Only add non-blank pages (check if canvas has content)
-        if (canvas.height > 10) {
+        // Only add non-blank pages
+        if (canvas.width > 10 && canvas.height > 10) {
           pages.push(canvas);
         }
       }
@@ -2243,6 +2254,7 @@ function ExportSection({ num }: { num: number }) {
     setExporting(true);
     const title = WS_TYPES.find(t => t.id === wsType)?.label || 'ورقة عمل';
     const tableFacts = shuffleArray(Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) })));
+    // Already shuffled above
     const children: Paragraph[] = [];
 
     // Title banner with styling

@@ -96,7 +96,7 @@ export default function ExercisesPage() {
                 {/* Addition String */}
                 <div className="text-center mb-6">
                   <p className="text-gray-500 text-sm font-semibold mb-2">الجمع المتكرر:</p>
-                  <div className="text-2xl font-black text-gray-700 bg-gray-50 rounded-xl p-3 border border-gray-200">
+                  <div className="text-base sm:text-2xl font-black text-gray-700 bg-gray-50 rounded-xl p-3 border border-gray-200 break-all">
                     {additions.map((val, i) => (
                       <span key={i}>
                         {formatNum(val, numberSystem)}

@@ -101,28 +101,35 @@ async function saveFile(dataUrl: string, filename: string) {
     const base64Data = commaIdx >= 0 ? dataUrl.substring(commaIdx + 1) : dataUrl;
     try {
       const result = await Filesystem.writeFile({
-        path: safeName,
-        data: base64Data,
-        directory: Directory.Documents,
-        recursive: true,
+        path: safeName, data: base64Data, directory: Directory.Documents, recursive: true,
       });
-      await Share.share({
-        title: filename,
-        url: result.uri,
-        dialogTitle: 'حفظ أو مشاركة الملف',
-      });
+      await Share.share({ title: filename, url: result.uri, dialogTitle: 'حفظ أو مشاركة الملف' });
     } catch (e) {
-      console.error('Filesystem error:', e);
+      console.error('Filesystem Documents error, trying Cache:', e);
       try {
-        const blob = await (await fetch(dataUrl)).blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        const result = await Filesystem.writeFile({
+          path: safeName, data: base64Data, directory: Directory.Cache, recursive: true,
+        });
+        await Share.share({ title: filename, url: result.uri, dialogTitle: 'حفظ أو مشاركة الملف' });
       } catch (e2) {
-        console.error('Fallback save error:', e2);
+        console.error('Filesystem Cache error, trying Data:', e2);
+        try {
+          const result = await Filesystem.writeFile({
+            path: safeName, data: base64Data, directory: Directory.Data, recursive: true,
+          });
+          await Share.share({ title: filename, url: result.uri, dialogTitle: 'حفظ أو مشاركة الملف' });
+        } catch (e3) {
+          console.error('All Filesystem writes failed:', e3);
+          try {
+            const blob = await (await fetch(dataUrl)).blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url; link.download = filename; link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          } catch (e4) {
+            console.error('Fallback save error:', e4);
+          }
+        }
       }
     }
   } else {
@@ -189,10 +196,21 @@ export default function WorksheetsPage() {
     try {
       const canvas = await html2canvas(previewRef.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-      const imgData = canvas.toDataURL('image/png');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+      const imgData = canvas.toDataURL('image/png');
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
       const pdfData = pdf.output('datauristring');
       await saveFile(pdfData, `${title || 'worksheet'}.pdf`);
     } catch (e) {

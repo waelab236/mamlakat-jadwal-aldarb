@@ -11,7 +11,14 @@ const LINES_COUNT = 5;
 function PracticeSheet({ tableNum }: { tableNum: number }) {
   const { numberSystem } = useSettings();
   const [written, setWritten] = useState<Record<string, string>>({});
-  const facts = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: tableNum * (i + 1) }));
+  const [facts] = useState(() => {
+    const arr = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: tableNum * (i + 1) }));
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  });
 
   const check = (key: string, expected: string) => written[key]?.trim() === expected.toString();
 

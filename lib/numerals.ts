@@ -1,3 +1,7 @@
+import { Capacitor } from '@capacitor/core';
+// @ts-ignore - optional dependency for native TTS
+import { TextToSpeech } from '@capacitor-community/text-to-speech';
+
 const ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
 
 export function toArabicNumeral(n: number): string {
@@ -170,6 +174,41 @@ export function warmUpSpeech(): void {
   }
 }
 
+// Check if we're on a native platform (Android/iOS)
+function isNative(): boolean {
+  return typeof window !== 'undefined' && Capacitor.isNativePlatform();
+}
+
+// Native TTS speak using @capacitor-community/text-to-speech
+// This works reliably on Android where Web Speech API often fails
+let nativeTTSAvailable = false;
+async function checkNativeTTS(): Promise<boolean> {
+  if (!isNative()) return false;
+  try {
+    // @ts-ignore
+    await TextToSpeech.checkAvailability();
+    nativeTTSAvailable = true;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function speakNative(text: string, lang: string, rate: number, pitch: number): Promise<void> {
+  try {
+    // @ts-ignore
+    await TextToSpeech.speak({
+      text,
+      lang,
+      rate,
+      pitch,
+      category: 'playback',
+    });
+  } catch (e) {
+    console.warn('Native TTS error:', e);
+  }
+}
+
 // Wait for voices to load (returns quickly if already loaded)
 function waitForVoices(timeout = 1000): Promise<SpeechSynthesisVoice[]> {
   return new Promise((resolve) => {
@@ -211,11 +250,18 @@ function pickArabicVoice(highPitch: boolean): SpeechSynthesisVoice | null {
 }
 
 export function speakArabic(text: string, voiceType: VoiceType = 'boy', rate: number = 0.8): void {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  try { speechSynthesis.cancel(); } catch (e) { /* ignore cancel errors on Android */ }
-
   const useHighPitch = voiceType === 'girl' || (voiceType === 'mixed' && !mixedBoyNext);
   if (voiceType === 'mixed') mixedBoyNext = !mixedBoyNext;
+
+  // On native (Android), use Capacitor TTS plugin which works reliably
+  if (isNative()) {
+    speakNative(text, 'ar-SA', rate * 1.0, useHighPitch ? 1.5 : 1.0);
+    return;
+  }
+
+  // Web: use Web Speech API
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
 
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'ar-SA';
@@ -224,15 +270,17 @@ export function speakArabic(text: string, voiceType: VoiceType = 'boy', rate: nu
   const voice = pickArabicVoice(useHighPitch);
   if (voice) u.voice = voice;
 
-  // Child-like pitch: boys ~1.0, girls ~1.5 (default is 1.0)
   u.pitch = useHighPitch ? 1.5 : 1.0;
-  // Volume always full
   u.volume = 1.0;
 
   try { speechSynthesis.speak(u); } catch (e) { console.warn('speak error:', e); }
 }
 
 export function speakEnglish(text: string): void {
+  if (isNative()) {
+    speakNative(text, 'en-US', 0.9, 1.0);
+    return;
+  }
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
   const u = new SpeechSynthesisUtterance(text);
@@ -266,16 +314,25 @@ export function speakEquationEnglish(a: number, b: number, result: number): void
 
 export async function speakFullTableArabic(num: number, voiceType: VoiceType = 'boy'): Promise<void> {
   warmUpSpeech();
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
-  // Wait for voices to be loaded before starting
+  // On native (Android), use Capacitor TTS - speak each equation sequentially
+  if (isNative()) {
+    for (let i = 1; i <= 12; i++) {
+      const r = num * i;
+      const text = `${AR_NUMS[num] || num} في ${AR_NUMS[i] || i} يساوي ${AR_NUMS[r] || r}`;
+      const useHighPitch = voiceType === 'girl' || (voiceType === 'mixed' && i % 2 === 0);
+      await speakNative(text, 'ar-SA', 0.75, useHighPitch ? 1.5 : 1.0);
+    }
+    return;
+  }
+
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   await waitForVoices();
   try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
 
   for (let i = 1; i <= 12; i++) {
     const r = num * i;
     const text = `${AR_NUMS[num] || num} في ${AR_NUMS[i] || i} يساوي ${AR_NUMS[r] || r}`;
-
     const useHighPitch = voiceType === 'girl' || (voiceType === 'mixed' && i % 2 === 0);
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'ar-SA';
@@ -284,14 +341,22 @@ export async function speakFullTableArabic(num: number, voiceType: VoiceType = '
     if (voice) u.voice = voice;
     u.pitch = useHighPitch ? 1.5 : 1.0;
     u.volume = 1.0;
-
-    // Queue each one - speechSynthesis will play them sequentially
     try { speechSynthesis.speak(u); } catch (e) { console.warn('speak error:', e); }
   }
 }
 
 export async function speakFullTableEnglish(num: number): Promise<void> {
   warmUpSpeech();
+
+  if (isNative()) {
+    for (let i = 1; i <= 12; i++) {
+      const r = num * i;
+      const text = `${EN_NUMS[num] || num} times ${EN_NUMS[i] || i} equals ${EN_NUMS[r] || r}`;
+      await speakNative(text, 'en-US', 0.9, 1.0);
+    }
+    return;
+  }
+
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
 
@@ -320,6 +385,8 @@ let chantNum = 0;
 let chantVoice: VoiceType = 'boy';
 let chantSpeedSetting: ChantSpeed = 'normal';
 
+let chantNativeRunning = false;
+
 export async function startChant(
   num: number,
   voiceType: VoiceType,
@@ -328,9 +395,7 @@ export async function startChant(
   onDone: () => void,
 ): Promise<ChantState> {
   warmUpSpeech();
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return 'idle';
 
-  await waitForVoices();
   stopChant();
 
   chantNum = num;
@@ -341,8 +406,42 @@ export async function startChant(
   chantOnDone = onDone;
   chantIsRepeating = false;
 
+  // On native (Android), use Capacitor TTS plugin
+  if (isNative()) {
+    chantNativeRunning = true;
+    runNativeChant();
+    return 'playing';
+  }
+
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return 'idle';
+  await waitForVoices();
   speakNextChantEquation();
   return 'playing';
+}
+
+async function runNativeChant(): Promise<void> {
+  const rate = SPEED_RATE[chantSpeedSetting];
+  while (chantNativeRunning && chantCurrentIdx < 12) {
+    const i = chantCurrentIdx + 1;
+    const r = chantNum * i;
+    const text = `${AR_NUMS[chantNum] || chantNum} في ${AR_NUMS[i] || i} يساوي ${AR_NUMS[r] || r}`;
+    const useHighPitch = chantVoice === 'girl' || (chantVoice === 'mixed' && chantCurrentIdx % 2 === 1);
+    chantOnIndexChange?.(chantCurrentIdx);
+    await speakNative(text, 'ar-SA', rate, useHighPitch ? 1.5 : 1.0);
+    if (!chantNativeRunning) break;
+    const pauseMs = chantSpeedSetting === 'slow' ? 700 : chantSpeedSetting === 'normal' ? 400 : 200;
+    await new Promise(r => setTimeout(r, pauseMs));
+    chantCurrentIdx++;
+  }
+  if (chantNativeRunning) {
+    chantNativeRunning = false;
+    if (chantIsRepeating) {
+      chantCurrentIdx = 0;
+      runNativeChant();
+    } else {
+      chantOnDone?.();
+    }
+  }
 }
 
 function speakNextChantEquation(): void {
@@ -394,6 +493,11 @@ function speakNextChantEquation(): void {
 let chantWasPausedMidGap = false;
 
 export function pauseChant(): void {
+  if (isNative()) {
+    chantNativeRunning = false;
+    try { TextToSpeech.stop(); } catch (e) { /* ignore */ }
+    return;
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try { speechSynthesis.pause(); } catch (e) { /* ignore */ }
   }
@@ -405,6 +509,11 @@ export function pauseChant(): void {
 }
 
 export function resumeChant(): void {
+  if (isNative()) {
+    chantNativeRunning = true;
+    runNativeChant();
+    return;
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try { speechSynthesis.resume(); } catch (e) { /* ignore */ }
   }
@@ -420,6 +529,10 @@ export function resumeChant(): void {
 }
 
 export function stopChant(): void {
+  chantNativeRunning = false;
+  if (isNative()) {
+    try { TextToSpeech.stop(); } catch (e) { /* ignore */ }
+  }
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
   }
