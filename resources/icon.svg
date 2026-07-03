@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="crown" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="200" fill="url(#bg)"/>
+  <!-- Crown -->
+  <path d="M 256 340 L 340 440 L 512 280 L 684 440 L 768 340 L 720 620 L 304 620 Z" fill="url(#crown)" stroke="#b45309" stroke-width="8"/>
+  <circle cx="256" cy="340" r="24" fill="#fbbf24" stroke="#b45309" stroke-width="6"/>
+  <circle cx="512" cy="280" r="28" fill="#fbbf24" stroke="#b45309" stroke-width="6"/>
+  <circle cx="768" cy="340" r="24" fill="#fbbf24" stroke="#b45309" stroke-width="6"/>
+  <rect x="304" y="620" width="416" height="40" rx="8" fill="#d97706"/>
+  <!-- × symbol -->
+  <text x="512" y="540" font-family="Arial, sans-serif" font-size="180" font-weight="900" fill="white" text-anchor="middle" dominant-baseline="middle">×</text>
+  <!-- Numbers -->
+  <text x="340" y="780" font-family="Arial, sans-serif" font-size="80" font-weight="900" fill="white" text-anchor="middle">١٢</text>
+  <text x="512" y="800" font-family="Arial, sans-serif" font-size="100" font-weight="900" fill="white" text-anchor="middle">×‎</text>
+  <text x="684" y="780" font-family="Arial, sans-serif" font-size="80" font-weight="900" fill="white" text-anchor="middle">١٢</text>
+</svg>

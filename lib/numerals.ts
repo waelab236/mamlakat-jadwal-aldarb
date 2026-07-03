@@ -151,6 +151,19 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   };
 }
 
+// Android/Capacitor WebView: speechSynthesis may need a user interaction to unlock.
+// This silent warm-up utterance primes the engine on first interaction.
+let speechWarmedUp = false;
+export function warmUpSpeech(): void {
+  if (speechWarmedUp) return;
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  speechWarmedUp = true;
+  const u = new SpeechSynthesisUtterance('');
+  u.volume = 0;
+  u.rate = 1;
+  speechSynthesis.speak(u);
+}
+
 // Wait for voices to load (returns quickly if already loaded)
 function waitForVoices(timeout = 1000): Promise<SpeechSynthesisVoice[]> {
   return new Promise((resolve) => {
@@ -230,11 +243,13 @@ let mixedBoyNext = true;
 // ═══════════════════════════════════════════════════════════
 
 export function speakEquationArabic(a: number, b: number, result: number, voiceType: VoiceType = 'boy'): void {
+  warmUpSpeech();
   const text = `${AR_NUMS[a] || a} في ${AR_NUMS[b] || b} يساوي ${AR_NUMS[result] || result}`;
   speakArabic(text, voiceType, 0.8);
 }
 
 export function speakEquationEnglish(a: number, b: number, result: number): void {
+  warmUpSpeech();
   const text = `${EN_NUMS[a] || a} times ${EN_NUMS[b] || b} equals ${EN_NUMS[result] || result}`;
   speakEnglish(text);
 }
@@ -244,6 +259,7 @@ export function speakEquationEnglish(a: number, b: number, result: number): void
 // ═══════════════════════════════════════════════════════════
 
 export async function speakFullTableArabic(num: number, voiceType: VoiceType = 'boy'): Promise<void> {
+  warmUpSpeech();
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
   // Wait for voices to be loaded before starting
@@ -269,6 +285,7 @@ export async function speakFullTableArabic(num: number, voiceType: VoiceType = '
 }
 
 export async function speakFullTableEnglish(num: number): Promise<void> {
+  warmUpSpeech();
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   speechSynthesis.cancel();
 
@@ -304,6 +321,7 @@ export async function startChant(
   onIndexChange: (idx: number) => void,
   onDone: () => void,
 ): Promise<ChantState> {
+  warmUpSpeech();
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return 'idle';
 
   await waitForVoices();
@@ -367,16 +385,31 @@ function speakNextChantEquation(): void {
   speechSynthesis.speak(u);
 }
 
+let chantWasPausedMidGap = false;
+
 export function pauseChant(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     speechSynthesis.pause();
   }
-  if (chantQueueTimer) { clearTimeout(chantQueueTimer); chantQueueTimer = null; }
+  if (chantQueueTimer) {
+    clearTimeout(chantQueueTimer);
+    chantQueueTimer = null;
+    chantWasPausedMidGap = true;
+  }
 }
 
 export function resumeChant(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     speechSynthesis.resume();
+  }
+  if (chantWasPausedMidGap) {
+    chantWasPausedMidGap = false;
+    const pauseMs = chantSpeedSetting === 'slow' ? 700 : chantSpeedSetting === 'normal' ? 400 : 200;
+    chantQueueTimer = setTimeout(() => {
+      chantCurrentIdx++;
+      chantOnIndexChange?.(chantCurrentIdx);
+      speakNextChantEquation();
+    }, pauseMs);
   }
 }
 

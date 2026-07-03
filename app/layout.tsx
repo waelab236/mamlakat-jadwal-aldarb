@@ -14,8 +14,12 @@ const cairo = Cairo({
 export const metadata: Metadata = {
   title: 'مملكة جدول الضرب',
   description: 'تطبيق تعليمي عربي تفاعلي لتعلم جداول الضرب للأطفال من 6 إلى 12 سنة',
+  icons: {
+    icon: '/favicon.png',
+    apple: '/icon.png',
+  },
   openGraph: {
-    images: [{ url: 'https://bolt.new/static/og_default.png' }],
+    images: [{ url: '/icon.png' }],
   },
 };
 

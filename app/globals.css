@@ -117,3 +117,18 @@
 ::-webkit-scrollbar-track { background: #f0f9ff; }
 ::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #0ea5e9; }
+
+/* Print styles */
+@media print {
+  body * { visibility: hidden; }
+  #worksheet-preview, #worksheet-preview *,
+  .printable-worksheet, .printable-worksheet * {
+    visibility: visible;
+  }
+  #worksheet-preview {
+    position: fixed; top: 0; left: 0; width: 100%;
+  }
+  .no-print { display: none !important; }
+  .page-break { page-break-before: always; }
+  .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+}

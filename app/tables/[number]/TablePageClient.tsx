@@ -10,6 +10,7 @@ import {
   speakEquationArabic, speakEquationEnglish,
   speakFullTableArabic, speakFullTableEnglish,
   startChant, pauseChant, resumeChant, stopChant,
+  warmUpSpeech,
   type VoiceType, type ChantSpeed, type ChantState,
 } from '@/lib/numerals';
 import html2canvas from 'html2canvas';
@@ -106,6 +107,7 @@ function SettingsBar({ num }: { num: number }) {
   const [speaking, setSpeaking] = useState(false);
 
   const listenAll = () => {
+    warmUpSpeech();
     setSpeaking(true);
     if (language === 'ar') speakFullTableArabic(num, voiceType);
     else speakFullTableEnglish(num);
@@ -159,6 +161,16 @@ function SettingsBar({ num }: { num: number }) {
 function LearnSection({ num, config }: { num: number; config: typeof TABLE_CONFIG[1] }) {
   const { numberSystem, language, voiceType, chantSpeed, setChantSpeed, chantRepeat, setChantRepeat } = useSettings();
   const facts = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) }));
+
+  // Fisher-Yates shuffle for randomizing worksheet questions
+  function shuffleArray<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
   const [revealAll, setRevealAll] = useState(false);
   const [autoPlay, setAutoPlay] = useState(false);
   const [autoIdx, setAutoIdx] = useState(-1);
@@ -169,6 +181,7 @@ function LearnSection({ num, config }: { num: number; config: typeof TABLE_CONFI
   const [chantIdx, setChantIdx] = useState(-1);
 
   const speakOne = (b: number, result: number) => {
+    warmUpSpeech();
     if (language === 'ar') speakEquationArabic(num, b, result, voiceType);
     else speakEquationEnglish(num, b, result);
   };
@@ -410,6 +423,16 @@ function WritingSection({ num }: { num: number }) {
   const { numberSystem, language } = useSettings();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const facts = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) }));
+
+  // Fisher-Yates shuffle for randomizing worksheet questions
+  function shuffleArray<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
   const correctCount = Object.keys(answers).filter(k => answers[k]?.trim() === facts[parseInt(k) - 1]?.result?.toString()).length;
 
   return (
@@ -1835,10 +1858,20 @@ function ExportSection({ num }: { num: number }) {
   const [exporting, setExporting] = useState(false);
   const facts = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) }));
 
+  // Fisher-Yates shuffle for randomizing worksheet questions
+  function shuffleArray<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
   // Generate full A4 HTML content for worksheet
   const createA4WorksheetHTML = (type: string, tableNum: number): string => {
     const title = WS_TYPES.find(t => t.id === type)?.label || 'ورقة عمل';
-    const tableFacts = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: tableNum * (i + 1) }));
+    const tableFacts = shuffleArray(Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: tableNum * (i + 1) })));
 
     let content = '';
     if (type === 'writing') {
@@ -1942,7 +1975,7 @@ function ExportSection({ num }: { num: number }) {
         <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 3px solid #d97706; border-radius: 16px; padding: 14px; margin-bottom: 16px;">
           <div style="font-size: 20px; font-weight: 900; color: #92400e; text-align: center; margin-bottom: 12px;">القسم ب: صواب أم خطأ</div>
           ${tableFacts.slice(0, 4).map((f, i) => {
-            const wrong = i % 2 === 0 ? f.result : f.result + 2;
+            const wrong = Math.random() > 0.5 ? f.result : f.result + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 4) + 1);
             return `<div style="font-size: 18px; font-weight: 700; color: #374151; padding: 8px; background: white; border-radius: 8px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;"><span>${i + 7}. ${formatNum(tableNum, numberSystem)} × ${formatNum(f.b, numberSystem)} = ${formatNum(wrong, numberSystem)}</span><span style="border: 2px solid #6b7280; border-radius: 4px; padding: 3px 10px; font-size: 14px;">صواب / خطأ</span></div>`;
           }).join('')}
         </div>
@@ -1984,6 +2017,7 @@ function ExportSection({ num }: { num: number }) {
     }
     .decor-bar { text-align: center; font-size: 20px; margin-bottom: 16px; opacity: 0.7; letter-spacing: 6px; }
     .content { width: 100%; }
+    .content > div { break-inside: avoid; page-break-inside: avoid; }
     .footer {
       border-top: 3px dashed #93c5fd; padding-top: 10px; margin-top: 20px;
       display: flex; justify-content: space-between; font-size: 13px; color: #6b7280;
@@ -2014,6 +2048,7 @@ function ExportSection({ num }: { num: number }) {
   };
 
   // Render worksheet HTML off-screen, capture full height, return array of A4-page canvases
+  // DOM-aware pagination: measures each card and splits at card boundaries
   const captureWorksheetPages = async (type: string, tableNum: number): Promise<HTMLCanvasElement[]> => {
     const htmlContent = createA4WorksheetHTML(type, tableNum);
 
@@ -2022,7 +2057,7 @@ function ExportSection({ num }: { num: number }) {
     iframe.style.top = '0';
     iframe.style.left = '-10000px';
     iframe.style.width = `${A4_PX_W}px`;
-    iframe.style.height = `${A4_PX_H * 4}px`; // tall enough for any content
+    iframe.style.height = `${A4_PX_H * 6}px`;
     iframe.style.border = 'none';
     iframe.style.visibility = 'hidden';
     document.body.appendChild(iframe);
@@ -2040,42 +2075,124 @@ function ExportSection({ num }: { num: number }) {
     const pageEl = iframeDoc.querySelector('.page') as HTMLElement;
     if (!pageEl) { document.body.removeChild(iframe); return []; }
 
-    // Capture full content at 2× scale
-    const fullCanvas = await html2canvas(pageEl, {
-      scale: 2,
-      width: A4_PX_W,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      windowWidth: A4_PX_W,
-      scrollX: 0,
-      scrollY: 0,
-    });
+    // Measure the header and footer heights (shared on every page)
+    const headerEl = iframeDoc.querySelector('.header') as HTMLElement;
+    const decorEl = iframeDoc.querySelector('.decor-bar') as HTMLElement;
+    const footerEl = iframeDoc.querySelector('.footer') as HTMLElement;
+    const contentEl = iframeDoc.querySelector('.content') as HTMLElement;
 
-    document.body.removeChild(iframe);
+    if (!contentEl || !headerEl) { document.body.removeChild(iframe); return []; }
 
-    // Slice full canvas into A4-height pages
-    const pageHeightPx = A4_PX_H * 2; // ×2 for scale
-    const totalPages = Math.ceil(fullCanvas.height / pageHeightPx);
-    const pages: HTMLCanvasElement[] = [];
+    const pagePadding = 50 + 60; // top + bottom padding from .page CSS
+    const headerHeight = headerEl.offsetHeight + 18 + (decorEl?.offsetHeight || 0) + 16; // header + margin + decor + margin
+    const footerHeight = (footerEl?.offsetHeight || 0) + 20; // footer + margin-top
+    const usableHeight = A4_PX_H - pagePadding - headerHeight - footerHeight;
 
-    for (let p = 0; p < totalPages; p++) {
-      const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = fullCanvas.width;
-      pageCanvas.height = pageHeightPx;
-      const ctx = pageCanvas.getContext('2d')!;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-      ctx.drawImage(
-        fullCanvas,
-        0, p * pageHeightPx,
-        fullCanvas.width, pageHeightPx,
-        0, 0,
-        fullCanvas.width, pageHeightPx,
-      );
-      pages.push(pageCanvas);
+    // Get all card elements (direct children of .content)
+    const cards = Array.from(contentEl.children) as HTMLElement[];
+    if (cards.length === 0) {
+      // Single-section worksheets (assessment) — capture as one page
+      const fullCanvas = await html2canvas(pageEl, {
+        scale: 2, width: A4_PX_W, useCORS: true, backgroundColor: '#ffffff',
+        logging: false, windowWidth: A4_PX_W, scrollX: 0, scrollY: 0,
+      });
+      document.body.removeChild(iframe);
+      const pageHeightPx = A4_PX_H * 2;
+      if (fullCanvas.height <= pageHeightPx) {
+        return [fullCanvas];
+      }
+      // Fallback: slice but avoid blank pages
+      const totalPages = Math.ceil(fullCanvas.height / pageHeightPx);
+      const pages: HTMLCanvasElement[] = [];
+      for (let p = 0; p < totalPages; p++) {
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = fullCanvas.width;
+        pageCanvas.height = pageHeightPx;
+        const ctx = pageCanvas.getContext('2d')!;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        const srcH = Math.min(pageHeightPx, fullCanvas.height - p * pageHeightPx);
+        if (srcH > 0) {
+          ctx.drawImage(fullCanvas, 0, p * pageHeightPx, fullCanvas.width, srcH, 0, 0, fullCanvas.width, srcH);
+          pages.push(pageCanvas);
+        }
+      }
+      return pages;
     }
 
+    // Group cards into pages based on their heights
+    const pageGroups: HTMLElement[][] = [];
+    let currentGroup: HTMLElement[] = [];
+    let currentHeight = 0;
+
+    for (const card of cards) {
+      const cardHeight = card.offsetHeight + 12; // + margin-bottom
+      if (currentHeight + cardHeight > usableHeight && currentGroup.length > 0) {
+        pageGroups.push(currentGroup);
+        currentGroup = [];
+        currentHeight = 0;
+      }
+      currentGroup.push(card);
+      currentHeight += cardHeight;
+    }
+    if (currentGroup.length > 0) pageGroups.push(currentGroup);
+
+    // For each page group, build a complete page HTML and capture it
+    const pages: HTMLCanvasElement[] = [];
+    const headerHTML = headerEl.outerHTML;
+    const decorHTML = decorEl?.outerHTML || '';
+    const footerHTML = footerEl?.outerHTML || '';
+
+    for (let pg = 0; pg < pageGroups.length; pg++) {
+      const groupCards = pageGroups[pg];
+      const cardsHTML = groupCards.map(c => c.outerHTML).join('');
+
+      const pageHTML = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
+          html, body { width: ${A4_PX_W}px; background: #ffffff; direction: rtl; }
+          .page { width: ${A4_PX_W}px; min-height: ${A4_PX_H}px; padding: 50px 56px 60px; background: linear-gradient(180deg, #f0f9ff 0%, #ffffff 60%, #f0fdf4 100%); }
+          .content > div { break-inside: avoid; page-break-inside: avoid; }
+        </style></head><body>
+        <div class="page">
+          ${headerHTML}
+          ${decorHTML}
+          <div class="content">${cardsHTML}</div>
+          ${footerHTML}
+        </div></body></html>`;
+
+      const pageIframe = document.createElement('iframe');
+      pageIframe.style.position = 'fixed';
+      pageIframe.style.top = '0';
+      pageIframe.style.left = '-10000px';
+      pageIframe.style.width = `${A4_PX_W}px`;
+      pageIframe.style.height = `${A4_PX_H * 2}px`;
+      pageIframe.style.border = 'none';
+      pageIframe.style.visibility = 'hidden';
+      document.body.appendChild(pageIframe);
+
+      const pageDoc = pageIframe.contentDocument || pageIframe.contentWindow?.document;
+      if (!pageDoc) { document.body.removeChild(pageIframe); continue; }
+      pageDoc.open();
+      pageDoc.write(pageHTML);
+      pageDoc.close();
+      await new Promise(r => setTimeout(r, 300));
+
+      const pageDiv = pageDoc.querySelector('.page') as HTMLElement;
+      if (pageDiv) {
+        const canvas = await html2canvas(pageDiv, {
+          scale: 2, width: A4_PX_W, useCORS: true, backgroundColor: '#ffffff',
+          logging: false, windowWidth: A4_PX_W, scrollX: 0, scrollY: 0,
+        });
+        // Only add non-blank pages (check if canvas has content)
+        if (canvas.height > 10) {
+          pages.push(canvas);
+        }
+      }
+      document.body.removeChild(pageIframe);
+    }
+
+    document.body.removeChild(iframe);
     return pages;
   };
 
@@ -2119,7 +2236,7 @@ function ExportSection({ num }: { num: number }) {
   const exportDOCX = async () => {
     setExporting(true);
     const title = WS_TYPES.find(t => t.id === wsType)?.label || 'ورقة عمل';
-    const tableFacts = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) }));
+    const tableFacts = shuffleArray(Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) })));
     const children: Paragraph[] = [];
 
     // Title banner with styling
@@ -2265,7 +2382,7 @@ function ExportSection({ num }: { num: number }) {
         spacing: { after: 200 },
       }));
       tableFacts.slice(0, 4).forEach((f, i) => {
-        const wrong = i % 2 === 0 ? f.result : f.result + 2;
+        const wrong = Math.random() > 0.5 ? f.result : f.result + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 4) + 1);
         children.push(new Paragraph({
           children: [new TextRun({ text: `${i + 7}. ${formatNum(num, numberSystem)} × ${formatNum(f.b, numberSystem)} = ${formatNum(wrong, numberSystem)}     [  صواب  /  خطأ  ]`, size: 32, bold: true })],
           spacing: { after: 110 },
@@ -2322,7 +2439,7 @@ function ExportSection({ num }: { num: number }) {
   // Preview worksheet (scaled for UI display)
   const renderWorksheetPreview = () => {
     const title = WS_TYPES.find(t => t.id === wsType)?.label || 'ورقة عمل';
-    const tableFacts = Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) }));
+    const tableFacts = shuffleArray(Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) })));
 
     return (
       <div className="bg-white rounded-2xl shadow-xl border-2 border-gray-200 overflow-hidden">

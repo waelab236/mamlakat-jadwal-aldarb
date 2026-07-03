@@ -15,6 +15,15 @@ import { Share } from '@capacitor/share';
 type Difficulty = 'easy' | 'medium' | 'hard';
 type QuestionType = 'fill' | 'multiple' | 'matching' | 'true_false';
 
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function generateWorksheetQuestions(tables: number[], difficulty: Difficulty, types: QuestionType[]) {
   const count = difficulty === 'easy' ? 12 : difficulty === 'medium' ? 16 : 20;
   const questions: { q: string; a: string; type: QuestionType }[] = [];
@@ -26,7 +35,7 @@ function generateWorksheetQuestions(tables: number[], difficulty: Difficulty, ty
     questions.push({ q: `${t} × ${b} = ___`, a: `${t * b}`, type });
   }
 
-  return questions;
+  return shuffleArray(questions);
 }
 
 const DECORATIONS = ['🌸', '⭐', '🌟', '🦋', '🌺', '🐝', '🌻', '🎀', '🌈', '🐱', '🌷', '✨'];
@@ -314,6 +323,7 @@ export default function WorksheetsPage() {
           body * { visibility: hidden; }
           #worksheet-preview, #worksheet-preview * { visibility: visible; }
           #worksheet-preview { position: fixed; top: 0; left: 0; width: 100%; }
+          .grid > div { break-inside: avoid; page-break-inside: avoid; }
         }
       `}</style>
     </div>
