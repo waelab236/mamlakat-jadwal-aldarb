@@ -24,9 +24,11 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
 async function saveFileNative(dataUrl: string, filename: string) {
+  const safeName = filename.replace(/[^a-zA-Z0-9.\-]/g, '_');
   if (Capacitor.isNativePlatform()) {
-    const base64Data = dataUrl.split(',')[1];
-    const safeName = filename.replace(/[^a-zA-Z0-9.\-]/g, '_');
+    // Parse base64 from data URL: "data:mime;base64,XXXX" -> "XXXX"
+    const commaIdx = dataUrl.indexOf(',');
+    const base64Data = commaIdx >= 0 ? dataUrl.substring(commaIdx + 1) : dataUrl;
     try {
       const result = await Filesystem.writeFile({
         path: safeName, data: base64Data, directory: Directory.Documents, recursive: true,
@@ -34,7 +36,11 @@ async function saveFileNative(dataUrl: string, filename: string) {
       await Share.share({ title: filename, url: result.uri, dialogTitle: 'حفظ أو مشاركة' });
     } catch (e) {
       console.error('Filesystem error:', e);
-      const link = document.createElement('a'); link.href = dataUrl; link.download = filename; link.click();
+      // Fallback: open in new window for manual save
+      const blob = await (await fetch(dataUrl)).blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
   } else {
     const link = document.createElement('a'); link.href = dataUrl; link.download = filename; link.click();
@@ -372,15 +378,15 @@ function VisualSection({ num }: { num: number }) {
           <h3 className="text-xl font-black">{language === 'ar' ? `فهم ${formatNum(num, numberSystem)} × ${formatNum(b, numberSystem)} بالصور` : `${formatNum(num, numberSystem)} × ${formatNum(b, numberSystem)} Visual`}</h3>
         </div>
         <div className="p-6">
-          <div className="my-4">
+          <div className="my-4 overflow-hidden">
             {Array.from({ length: Math.min(num, 10) }, (_, r) => (
               <motion.div key={r} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: r * 0.12 }}
-                className="grid justify-center mb-1 mx-auto"
-                style={{ gridTemplateColumns: `repeat(${Math.min(b, 12)}, minmax(0, 1fr))`, maxWidth: `${Math.min(b, 12) * 2.5}rem` }}>
+                className="grid justify-center mb-1 mx-auto w-full"
+                style={{ gridTemplateColumns: `repeat(${Math.min(b, 12)}, minmax(0, 1fr))`, maxWidth: '100%' }}>
                 {Array.from({ length: Math.min(b, 12) }, (_, c) => (
                   <motion.span key={c}
                     className="text-center leading-none"
-                    style={{ fontSize: b <= 4 ? '1.75rem' : b <= 6 ? '1.5rem' : b <= 8 ? '1.25rem' : '1rem' }}
+                    style={{ fontSize: b <= 3 ? '2rem' : b <= 5 ? '1.5rem' : b <= 7 ? '1.25rem' : b <= 9 ? '1rem' : '0.75rem' }}
                     initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: r * 0.12 + c * 0.04 }}>
                     {item.emoji}
                   </motion.span>
@@ -518,7 +524,7 @@ function AdditionSection({ num }: { num: number }) {
           )}
         </AnimatePresence>
         <div className="flex justify-between mt-3 text-sm font-bold">
-          <span className="text-green-600">✅ {formatNum(score, numberSystem)}</span><span className="text-orange-500">🔥 {streak}</span>
+          <span className="text-green-600">✅ {formatNum(score, numberSystem)}</span><span className="text-orange-500">🔥 {formatNum(streak, numberSystem)}</span>
           <button onClick={() => { setB(Math.floor(Math.random() * 12) + 1); setAnswer(''); setFeedback(null); }} className="text-sky-500 hover:text-sky-700 flex items-center gap-1"><RotateCcw className="w-3 h-3" /> جديد</button>
         </div>
       </div>
@@ -2430,7 +2436,10 @@ function ExportSection({ num }: { num: number }) {
         }
       }
 
-      pdf.save(`table-${num}-full-package.pdf`);
+      const pdfData = pdf.output('datauristring');
+      await saveFileNative(pdfData, `table-${num}-full-package.pdf`);
+    } catch (e) {
+      console.error('Full package export error:', e);
     } finally {
       setExporting(false);
     }
@@ -2549,7 +2558,7 @@ function ExportSection({ num }: { num: number }) {
         <button onClick={() => exportImage('png')} disabled={exporting} className="flex items-center justify-center gap-2 bg-orange-500 text-white font-bold py-3 rounded-xl hover:bg-orange-600 text-sm disabled:opacity-50"><Download className="w-4 h-4" /> PNG</button>
         <button onClick={() => exportImage('jpg')} disabled={exporting} className="flex items-center justify-center gap-2 bg-amber-500 text-white font-bold py-3 rounded-xl hover:bg-amber-600 text-sm disabled:opacity-50"><Download className="w-4 h-4" /> JPG</button>
         <button onClick={exportDOCX} disabled={exporting} className="flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 text-sm disabled:opacity-50"><Download className="w-4 h-4" /> DOCX</button>
-        <button onClick={() => window.print()} className="flex items-center justify-center gap-2 bg-sky-500 text-white font-bold py-3 rounded-xl hover:bg-sky-600 text-sm"><Printer className="w-4 h-4" /> طباعة</button>
+        <button onClick={async () => { if (Capacitor.isNativePlatform()) { await exportPDF(); } else { window.print(); } }} className="flex items-center justify-center gap-2 bg-sky-500 text-white font-bold py-3 rounded-xl hover:bg-sky-600 text-sm"><Printer className="w-4 h-4" /> طباعة</button>
       </div>
 
       <button onClick={exportFullPackage} disabled={exporting}

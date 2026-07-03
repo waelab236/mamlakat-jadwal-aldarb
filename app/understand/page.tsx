@@ -33,15 +33,15 @@ function VisualMultiplication({ rows, cols, item }: { rows: number; cols: number
         <p className="text-gray-500 text-sm">{formatNum(rows, numberSystem)} مجموعات من {formatNum(cols, numberSystem)} {item.name}</p>
       </div>
 
-      <div className="my-6">
+      <div className="my-6 overflow-hidden">
         {Array.from({ length: rows }, (_, r) => (
           <motion.div key={r} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: r * 0.15 }}
-            className="grid justify-center mb-1"
-            style={{ gridTemplateColumns: `repeat(${Math.min(cols, 10)}, minmax(0, 1fr))`, maxWidth: `${Math.min(cols, 10) * 3}rem`, margin: '0 auto' }}>
+            className="grid justify-center mb-1 mx-auto w-full"
+            style={{ gridTemplateColumns: `repeat(${Math.min(cols, 10)}, minmax(0, 1fr))`, maxWidth: '100%' }}>
             {Array.from({ length: cols }, (_, c) => (
               <motion.span key={c}
                 className="text-center leading-none"
-                style={{ fontSize: cols <= 4 ? '1.75rem' : cols <= 6 ? '1.5rem' : cols <= 8 ? '1.25rem' : '1rem' }}
+                style={{ fontSize: cols <= 3 ? '2rem' : cols <= 5 ? '1.5rem' : cols <= 7 ? '1.25rem' : cols <= 9 ? '1rem' : '0.75rem' }}
                 initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: r * 0.15 + c * 0.05 }}>
                 {item.emoji}
               </motion.span>

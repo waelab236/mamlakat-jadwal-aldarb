@@ -95,12 +95,13 @@ function WorksheetPreview({ config, numberSystem }: {
 
 
 async function saveFile(dataUrl: string, filename: string) {
+  const safeName = filename.replace(/[^a-zA-Z0-9.\-]/g, '_');
   if (Capacitor.isNativePlatform()) {
-    const base64Data = dataUrl.split(',')[1];
-    const fileName = filename.replace(/[^a-zA-Z0-9.\-]/g, '_');
+    const commaIdx = dataUrl.indexOf(',');
+    const base64Data = commaIdx >= 0 ? dataUrl.substring(commaIdx + 1) : dataUrl;
     try {
       const result = await Filesystem.writeFile({
-        path: fileName,
+        path: safeName,
         data: base64Data,
         directory: Directory.Documents,
         recursive: true,
@@ -112,10 +113,17 @@ async function saveFile(dataUrl: string, filename: string) {
       });
     } catch (e) {
       console.error('Filesystem error:', e);
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = filename;
-      link.click();
+      try {
+        const blob = await (await fetch(dataUrl)).blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e2) {
+        console.error('Fallback save error:', e2);
+      }
     }
   } else {
     const link = document.createElement('a');
@@ -166,7 +174,13 @@ export default function WorksheetsPage() {
     setSaving(false);
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = async () => {
+    if (Capacitor.isNativePlatform()) {
+      await exportPDF();
+    } else {
+      window.print();
+    }
+  };
 
   const previewRef = useRef<HTMLDivElement>(null);
 

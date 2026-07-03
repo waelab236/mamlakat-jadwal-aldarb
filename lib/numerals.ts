@@ -158,10 +158,16 @@ export function warmUpSpeech(): void {
   if (speechWarmedUp) return;
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   speechWarmedUp = true;
-  const u = new SpeechSynthesisUtterance('');
-  u.volume = 0;
-  u.rate = 1;
-  speechSynthesis.speak(u);
+  try {
+    // Use a minimal space character - empty strings are ignored by Android WebView
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    u.rate = 1;
+    u.lang = 'ar-SA';
+    speechSynthesis.speak(u);
+  } catch (e) {
+    console.warn('warmUpSpeech error:', e);
+  }
 }
 
 // Wait for voices to load (returns quickly if already loaded)
@@ -206,7 +212,7 @@ function pickArabicVoice(highPitch: boolean): SpeechSynthesisVoice | null {
 
 export function speakArabic(text: string, voiceType: VoiceType = 'boy', rate: number = 0.8): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  speechSynthesis.cancel();
+  try { speechSynthesis.cancel(); } catch (e) { /* ignore cancel errors on Android */ }
 
   const useHighPitch = voiceType === 'girl' || (voiceType === 'mixed' && !mixedBoyNext);
   if (voiceType === 'mixed') mixedBoyNext = !mixedBoyNext;
@@ -223,16 +229,16 @@ export function speakArabic(text: string, voiceType: VoiceType = 'boy', rate: nu
   // Volume always full
   u.volume = 1.0;
 
-  speechSynthesis.speak(u);
+  try { speechSynthesis.speak(u); } catch (e) { console.warn('speak error:', e); }
 }
 
 export function speakEnglish(text: string): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  speechSynthesis.cancel();
+  try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US';
   u.rate = 0.9;
-  speechSynthesis.speak(u);
+  try { speechSynthesis.speak(u); } catch (e) { console.warn('speak error:', e); }
 }
 
 // Track alternating for mixed mode
@@ -264,7 +270,7 @@ export async function speakFullTableArabic(num: number, voiceType: VoiceType = '
 
   // Wait for voices to be loaded before starting
   await waitForVoices();
-  speechSynthesis.cancel();
+  try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
 
   for (let i = 1; i <= 12; i++) {
     const r = num * i;
@@ -280,14 +286,14 @@ export async function speakFullTableArabic(num: number, voiceType: VoiceType = '
     u.volume = 1.0;
 
     // Queue each one - speechSynthesis will play them sequentially
-    speechSynthesis.speak(u);
+    try { speechSynthesis.speak(u); } catch (e) { console.warn('speak error:', e); }
   }
 }
 
 export async function speakFullTableEnglish(num: number): Promise<void> {
   warmUpSpeech();
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-  speechSynthesis.cancel();
+  try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
 
   for (let i = 1; i <= 12; i++) {
     const r = num * i;
@@ -295,7 +301,7 @@ export async function speakFullTableEnglish(num: number): Promise<void> {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'en-US';
     u.rate = 0.9;
-    speechSynthesis.speak(u);
+    try { speechSynthesis.speak(u); } catch (e) { console.warn('speak error:', e); }
   }
 }
 
@@ -382,14 +388,14 @@ function speakNextChantEquation(): void {
   };
 
   chantOnIndexChange?.(chantCurrentIdx);
-  speechSynthesis.speak(u);
+  try { speechSynthesis.speak(u); } catch (e) { console.warn('speak error:', e); }
 }
 
 let chantWasPausedMidGap = false;
 
 export function pauseChant(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    speechSynthesis.pause();
+    try { speechSynthesis.pause(); } catch (e) { /* ignore */ }
   }
   if (chantQueueTimer) {
     clearTimeout(chantQueueTimer);
@@ -400,7 +406,7 @@ export function pauseChant(): void {
 
 export function resumeChant(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    speechSynthesis.resume();
+    try { speechSynthesis.resume(); } catch (e) { /* ignore */ }
   }
   if (chantWasPausedMidGap) {
     chantWasPausedMidGap = false;
@@ -415,7 +421,7 @@ export function resumeChant(): void {
 
 export function stopChant(): void {
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-    speechSynthesis.cancel();
+    try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
   }
   if (chantQueueTimer) { clearTimeout(chantQueueTimer); chantQueueTimer = null; }
   chantOnIndexChange = null;
