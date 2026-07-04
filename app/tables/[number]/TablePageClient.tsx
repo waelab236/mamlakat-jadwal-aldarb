@@ -123,8 +123,32 @@ function findFactorPairs(n: number): [number, number][] {
 
 function generateChoices(correct: number): number[] {
   const set = new Set<number>([correct]);
-  while (set.size < 4) { const v = correct + Math.floor(Math.random() * 10) - 5; if (v > 0 && v !== correct) set.add(v); }
-  return Array.from(set).sort(() => Math.random() - 0.5);
+  // Generate wrong answers that are positive, different from correct, and unique
+  let attempts = 0;
+  while (set.size < 4 && attempts < 100) {
+    attempts++;
+    // Spread wrong answers around the correct value
+    const delta = Math.floor(Math.random() * 10) - 5;
+    const v = correct + delta;
+    if (v > 0 && v !== correct) set.add(v);
+  }
+  // If we couldn't generate enough unique values near the correct answer,
+  // fill with values further away
+  let offset = 6;
+  while (set.size < 4) {
+    const v1 = correct + offset;
+    const v2 = correct - offset;
+    if (v1 > 0 && !set.has(v1)) set.add(v1);
+    if (set.size < 4 && v2 > 0 && !set.has(v2)) set.add(v2);
+    offset++;
+  }
+  // Shuffle the 4 choices
+  const arr = Array.from(set);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1732,8 +1756,12 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
   const [questions] = useState(() => {
     const arr = Array.from({ length: 10 }, (_, i) => {
       const b = i + 1; const r = num * b;
-      return { q: `${num} × ${b}`, answer: r, choices: generateChoices(r) };
+      // Pre-generate the T/F shown value: 50% correct, 50% wrong
+      const isTrue = Math.random() > 0.5;
+      const tfShown = isTrue ? r : r + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 3) + 1);
+      return { b, answer: r, choices: generateChoices(r), tfShown, tfIsTrue: isTrue };
     });
+    // Shuffle question order
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -1745,11 +1773,6 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
-  const [tfShown, setTfShown] = useState(() => {
-    const r = Math.random();
-    if (r > 0.5) return questions[0].answer;
-    return questions[0].answer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 3) + 1);
-  });
 
   const handleMultipleChoice = (choice: number) => {
     if (feedback) return;
@@ -1762,7 +1785,10 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
 
   const handleFill = () => {
     if (!fillAnswer.trim() || feedback) return;
-    const correct = parseInt(fillAnswer) === questions[idx].answer;
+    // Parse Arabic or Western digits
+    const normalized = fillAnswer.trim().replace(/[٠-٩]/g, (d: string) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+    const userNum = parseInt(normalized);
+    const correct = userNum === questions[idx].answer;
     setFeedback(correct ? 'correct' : 'wrong');
     updateTableProgress(num, correct);
     if (correct) setScore(s => s + 1);
@@ -1771,8 +1797,8 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
 
   const handleTF = (ans: boolean) => {
     if (feedback) return;
-    const isActuallyCorrect = tfShown === questions[idx].answer;
-    const correct = (ans && isActuallyCorrect) || (!ans && !isActuallyCorrect);
+    // Compare against the pre-stored tfIsTrue flag for THIS question
+    const correct = ans === questions[idx].tfIsTrue;
     setFeedback(correct ? 'correct' : 'wrong');
     updateTableProgress(num, correct);
     if (correct) setScore(s => s + 1);
@@ -1782,12 +1808,6 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
   const advance = () => {
     if (idx < questions.length - 1) {
       setIdx(i => i + 1); setFillAnswer(''); setFeedback(null);
-      const nextAnswer = questions[idx + 1].answer;
-      if (Math.random() > 0.5) {
-        setTfShown(nextAnswer);
-      } else {
-        setTfShown(nextAnswer + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 3) + 1));
-      }
     } else { setDone(true); addStars(score); }
   };
 
@@ -1819,7 +1839,7 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
       <motion.div key={idx} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
         {quizType === 'multiple' && (
           <>
-            <div className="text-4xl md:text-5xl font-black text-sky-700 text-center mb-6">{formatEquation(num, idx + 1, NaN, numberSystem).replace(/NaN/, '?')}</div>
+            <div className="text-4xl md:text-5xl font-black text-sky-700 text-center mb-6">{formatEquation(num, questions[idx].b, NaN, numberSystem).replace(/NaN/, '?')}</div>
             <div className="grid grid-cols-2 gap-3">
               {questions[idx].choices.map(c => (
                 <motion.button key={c} whileTap={{ scale: 0.95 }} onClick={() => handleMultipleChoice(c)}
@@ -1832,7 +1852,7 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
         )}
         {quizType === 'truefalse' && (
           <>
-            <div className="text-4xl font-black text-sky-700 text-center mb-6">{formatNum(num, numberSystem)} × {formatNum(idx + 1, numberSystem)} = {formatNum(tfShown, numberSystem)}</div>
+            <div className="text-4xl font-black text-sky-700 text-center mb-6">{formatNum(num, numberSystem)} × {formatNum(questions[idx].b, numberSystem)} = {formatNum(questions[idx].tfShown, numberSystem)}</div>
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => handleTF(true)} className="py-8 text-2xl font-black rounded-2xl bg-green-500 text-white hover:bg-green-600 shadow-md hover:scale-105 transition-all">✅ صواب</button>
               <button onClick={() => handleTF(false)} className="py-8 text-2xl font-black rounded-2xl bg-red-500 text-white hover:bg-red-600 shadow-md hover:scale-105 transition-all">❌ خطأ</button>
@@ -1841,7 +1861,7 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
         )}
         {quizType === 'fill' && (
           <>
-            <div className="text-4xl md:text-5xl font-black text-sky-700 text-center mb-6">{formatEquation(num, idx + 1, NaN, numberSystem).replace(/NaN/, '?')}</div>
+            <div className="text-4xl md:text-5xl font-black text-sky-700 text-center mb-6">{formatEquation(num, questions[idx].b, NaN, numberSystem).replace(/NaN/, '?')}</div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <input type="text" value={fillAnswer} onChange={e => setFillAnswer(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleFill()} placeholder="؟" inputMode="numeric"
                 className={`flex-1 text-center text-3xl font-black border-2 rounded-xl py-3 focus:outline-none min-w-0 ${feedback === 'correct' ? 'border-green-400 bg-green-50 text-green-700' : feedback === 'wrong' ? 'border-red-300 bg-red-50 text-red-600' : 'border-sky-300 focus:border-sky-500'}`} />

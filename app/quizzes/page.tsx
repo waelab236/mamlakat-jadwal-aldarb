@@ -15,8 +15,19 @@ function generateQuestion(tables: number[], type: QuizType) {
   const result = tableNum * b;
 
   if (type === 'truefalse') {
-    const isCorrect = Math.random() > 0.5;
-    const shownResult = isCorrect ? result : result + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 5) + 1);
+    // 50/50 true or false
+    const isCorrect = Math.random() >= 0.5;
+    let shownResult: number;
+    if (isCorrect) {
+      shownResult = result;
+    } else {
+      // Generate a wrong result that is definitely different from the correct one
+      let delta = 0;
+      do {
+        delta = (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 5) + 1);
+      } while (result + delta === result || result + delta <= 0);
+      shownResult = result + delta;
+    }
     return {
       type,
       question: `${tableNum} × ${b} = ${shownResult}`,
@@ -27,12 +38,29 @@ function generateQuestion(tables: number[], type: QuizType) {
   }
 
   if (type === 'multiple' || type === 'timed') {
+    // Generate 3 unique wrong answers, then add the correct answer, then shuffle
     const wrong = new Set<number>();
-    while (wrong.size < 3) {
+    let attempts = 0;
+    while (wrong.size < 3 && attempts < 100) {
+      attempts++;
       const v = result + (Math.floor(Math.random() * 10) - 4);
       if (v > 0 && v !== result) wrong.add(v);
     }
-    const choices = Array.from(wrong).concat([result]).sort(() => Math.random() - 0.5);
+    // Fill with further-away values if needed
+    let offset = 5;
+    while (wrong.size < 3) {
+      const v1 = result + offset;
+      const v2 = result - offset;
+      if (v1 > 0 && !wrong.has(v1) && v1 !== result) wrong.add(v1);
+      if (wrong.size < 3 && v2 > 0 && !wrong.has(v2) && v2 !== result) wrong.add(v2);
+      offset++;
+    }
+    const choices = Array.from(wrong).concat([result]);
+    // Fisher-Yates shuffle
+    for (let i = choices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [choices[i], choices[j]] = [choices[j], choices[i]];
+    }
     return { type, question: `${tableNum} × ${b} = ?`, answer: result.toString(), choices: choices.map(String), tableNum, b, result };
   }
 
@@ -83,7 +111,17 @@ function QuizGame({ quizType, tables, onEnd }: { quizType: QuizType; tables: num
   const handleAnswer = (ans: string, fromUser = true) => {
     clearInterval(timerRef.current!);
     if (feedback) return;
-    const correct = fromUser && ans === q.answer;
+    let correct = false;
+    if (fromUser) {
+      if (q.type === 'fill') {
+        // Parse Arabic or Western digits and compare numerically
+        const normalized = ans.trim().replace(/[٠-٩]/g, (d: string) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+        const userNum = parseInt(normalized);
+        correct = userNum === q.result;
+      } else {
+        correct = ans === q.answer;
+      }
+    }
     setSelected(ans);
     setFeedback(correct ? 'correct' : 'wrong');
     updateTableProgress(q.tableNum, correct);
