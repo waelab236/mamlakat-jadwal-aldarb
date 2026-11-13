@@ -11,6 +11,7 @@ import { Printer, RefreshCw, Download, FileText, Star, FileDown } from 'lucide-r
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { TEACHER_CREDIT } from '@/components/layout/Footer';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 type QuestionType = 'fill' | 'multiple' | 'matching' | 'true_false';
@@ -86,7 +87,7 @@ function WorksheetPreview({ config, numberSystem }: {
       {/* Footer */}
       <div className="bg-sky-50 border-t border-sky-100 p-3 flex justify-between items-center text-xs text-gray-400">
         <div className="flex gap-1 text-lg">{DECORATIONS.slice(4, 9).map((d, i) => <span key={i}>{d}</span>)}</div>
-        <span className="font-semibold">مملكة جدول الضرب</span>
+        <span className="font-semibold">{TEACHER_CREDIT}</span>
         <div className="flex gap-1 text-lg">{DECORATIONS.slice(9).map((d, i) => <span key={i}>{d}</span>)}</div>
       </div>
     </div>

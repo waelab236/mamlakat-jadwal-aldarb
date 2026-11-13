@@ -321,12 +321,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-sky-700 text-white text-center py-6">
-        <div className="text-2xl mb-2">👑</div>
-        <p className="font-bold">مملكة جدول الضرب</p>
-        <p className="text-sky-200 text-sm mt-1">تطبيق تعليمي للأطفال من 6 إلى 12 سنة</p>
-      </footer>
     </div>
   );
 }

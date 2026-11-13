@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStudent } from '@/lib/student-context';
 import { useSettings } from '@/lib/settings-context';
+import { TEACHER_CREDIT } from '@/components/layout/Footer';
 import {
   formatNum, formatEquation, formatText,
   speakEquationArabic, speakEquationEnglish,
@@ -2095,7 +2096,7 @@ function ExportSection({ num }: { num: number }) {
     <div class="content">${content}</div>
     <div class="footer">
       <span>🌸⭐🦋🌺🐝</span>
-      <span style="font-weight:900;color:#3b82f6;font-size:15px;">مملكة جدول الضرب</span>
+      <span style="font-weight:900;color:#3b82f6;font-size:15px;">مستر وائل عبد الله – قناة التأسيس السليم</span>
       <span>🐝🌺🦋⭐🌸</span>
     </div>
   </div>
@@ -2566,7 +2567,7 @@ function ExportSection({ num }: { num: number }) {
           )}
         </div>
         <div className="bg-sky-50 border-t p-2 flex justify-between text-xs text-gray-400">
-          <span>🌸⭐🦋🌺</span><span className="font-semibold">مملكة جدول الضرب</span><span>🌺🐝🌸⭐</span>
+          <span>🌸⭐🦋🌺</span><span className="font-semibold">{TEACHER_CREDIT}</span><span>🌺🐝🌸⭐</span>
         </div>
       </div>
     );

@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useSettings } from '@/lib/settings-context';
+import { TEACHER_CREDIT } from '@/components/layout/Footer';
 import { formatNum, formatText } from '@/lib/numerals';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -123,7 +124,7 @@ function BulkWorksheetPreview({ num, wsType, numberSystem, language }: { num: nu
         )}
       </div>
       <div className="bg-sky-50 border-t p-2 flex justify-between text-xs text-gray-400">
-        <span>🌸⭐🦋🌺</span><span className="font-semibold">مملكة جدول الضرب</span><span>🌺🐝🌸⭐</span>
+        <span>🌸⭐🦋🌺</span><span className="font-semibold">{TEACHER_CREDIT}</span><span>🌺🐝🌸⭐</span>
       </div>
     </div>
   );
@@ -338,7 +339,7 @@ export default function TeacherPage() {
                     </div>
                     <div className="bg-sky-50 border-t p-2 text-center text-xs text-gray-400 flex justify-between">
                       <span>🌸⭐🦋🌺</span>
-                      <span>مملكة جدول الضرب</span>
+                      <span>{TEACHER_CREDIT}</span>
                       <span>🌸⭐🦋🌺</span>
                     </div>
                   </div>

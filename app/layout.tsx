@@ -4,6 +4,7 @@ import { Cairo } from 'next/font/google';
 import { StudentProvider } from '@/lib/student-context';
 import { SettingsProvider } from '@/lib/settings-context';
 import Navbar from '@/components/layout/Navbar';
+import Footer from '@/components/layout/Footer';
 
 const cairo = Cairo({
   subsets: ['arabic', 'latin'],
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SettingsProvider>
             <Navbar />
             <main className="min-h-screen">{children}</main>
+            <Footer />
           </SettingsProvider>
         </StudentProvider>
       </body>
