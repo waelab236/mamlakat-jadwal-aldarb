@@ -7,7 +7,7 @@ import { useSettings } from '@/lib/settings-context';
 import { formatNum, formatText } from '@/lib/numerals';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { Printer, RefreshCw, Download, FileText, Star, FileDown } from 'lucide-react';
+import { Printer, RefreshCw, FileText, Star, FileDown } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -220,18 +220,6 @@ export default function WorksheetsPage() {
     }
   };
 
-  const exportImage = async (format: 'png' | 'jpg') => {
-    if (!previewRef.current) return;
-    try {
-      const canvas = await html2canvas(previewRef.current, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-      const dataUrl = canvas.toDataURL(`image/${format}`);
-      await saveFile(dataUrl, `${title || 'worksheet'}.${format}`);
-    } catch (e) {
-      console.error('Image export error:', e);
-      alert('تعذر تصدير الصورة');
-    }
-  };
-
   const config = { tables, difficulty, studentName, teacherName, schoolName, title };
 
   return (
@@ -321,12 +309,6 @@ export default function WorksheetsPage() {
                   </button>
                   <button onClick={() => exportPDF()} className="flex items-center justify-center gap-2 bg-red-500 text-white font-bold py-3 rounded-xl hover:bg-red-600 shadow-md text-sm">
                     <FileDown className="w-4 h-4" /> PDF
-                  </button>
-                  <button onClick={() => exportImage('png')} className="flex items-center justify-center gap-2 bg-orange-500 text-white font-bold py-3 rounded-xl hover:bg-orange-600 shadow-md text-sm">
-                    <Download className="w-4 h-4" /> PNG
-                  </button>
-                  <button onClick={() => exportImage('jpg')} className="flex items-center justify-center gap-2 bg-amber-500 text-white font-bold py-3 rounded-xl hover:bg-amber-600 shadow-md text-sm">
-                    <Download className="w-4 h-4" /> JPG
                   </button>
                 </div>
                 <div className="flex gap-3 mt-3">

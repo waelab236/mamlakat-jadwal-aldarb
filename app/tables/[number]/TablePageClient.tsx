@@ -16,10 +16,6 @@ import {
 } from '@/lib/numerals';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import {
-  Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel,
-  Table, TableRow, TableCell, WidthType, BorderStyle,
-} from 'docx';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -1889,7 +1885,7 @@ function QuizSection({ num, onPass }: { num: number; onPass: () => void }) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SECTION 9: WORKSHEET EXPORT (7 types + PDF/PNG/JPG/DOCX + Package)
+// SECTION 9: WORKSHEET EXPORT (7 types + PDF + Package)
 // ═══════════════════════════════════════════════════════════
 
 const WS_TYPES = [
@@ -2252,208 +2248,6 @@ function ExportSection({ num }: { num: number }) {
     }
   };
 
-  const exportImage = async (format: 'png' | 'jpg') => {
-    setExporting(true);
-    try {
-      const pages = await captureWorksheetPages(wsType, num);
-      for (let i = 0; i < pages.length; i++) {
-        const canvas = pages[i];
-        const dataUrl = canvas.toDataURL(`image/${format}`, 0.95);
-        const filename = pages.length > 1
-          ? `table-${num}-${wsType}-page${i + 1}.${format}`
-          : `table-${num}-${wsType}.${format}`;
-        await saveFileNative(dataUrl, filename);
-      }
-    } catch (e) {
-      console.error('Image export error:', e);
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const exportDOCX = async () => {
-    setExporting(true);
-    const title = WS_TYPES.find(t => t.id === wsType)?.label || 'ورقة عمل';
-    const tableFacts = shuffleArray(Array.from({ length: 12 }, (_, i) => ({ b: i + 1, result: num * (i + 1) })));
-    // Already shuffled above
-    const children: Paragraph[] = [];
-
-    // Title banner with styling
-    children.push(new Paragraph({
-      children: [new TextRun({ text: `${title} - جدول ${formatNum(num, numberSystem)}`, bold: true, size: 56, color: '1d4ed8' })],
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 300 },
-      border: { bottom: { style: BorderStyle.SINGLE, size: 24, color: '3b82f6' } },
-    }));
-
-    // Info row
-    children.push(new Paragraph({
-      children: [
-        new TextRun({ text: '📝 الاسم: _______________________    ', size: 28 }),
-        new TextRun({ text: '📅 التاريخ: ___________    ', size: 28 }),
-        new TextRun({ text: '⭐ الدرجة: ____ / 12', size: 28 }),
-      ],
-      spacing: { after: 400 },
-    }));
-
-    // Content based on type
-    if (wsType === 'writing') {
-      tableFacts.forEach((f, i) => {
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: `${i + 1}. `, size: 36, bold: true, color: '0369a1' }),
-            new TextRun({ text: `${formatNum(num, numberSystem)} × ${formatNum(f.b, numberSystem)} = ${formatNum(f.result, numberSystem)}`, size: 36, bold: true }),
-          ],
-          spacing: { after: 80 },
-        }));
-        // Practice lines
-        for (let j = 0; j < 3; j++) {
-          children.push(new Paragraph({
-            children: [new TextRun({ text: `       ${formatNum(num, numberSystem)} × ${formatNum(f.b, numberSystem)} = ____________`, size: 32, color: '64748b' })],
-            spacing: { after: 60 },
-          }));
-        }
-        children.push(new Paragraph({ children: [], spacing: { after: 120 } }));
-      });
-    } else if (wsType === 'addition') {
-      tableFacts.slice(0, 6).forEach((f, i) => {
-        const addends = Array.from({ length: num }, () => `${formatNum(f.b, numberSystem)}`).join(' + ');
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: `${i + 1}. `, size: 36, bold: true, color: '92400e' }),
-            new TextRun({ text: `${addends} = `, size: 36, bold: true }),
-            new TextRun({ text: '____________', size: 36, color: '6b7280' }),
-          ],
-          spacing: { after: 300 },
-          border: { bottom: { style: BorderStyle.DOTTED, size: 6, color: 'd97706' } },
-        }));
-      });
-    } else if (wsType === 'commutative') {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: 'خاصية الإبدال: أ × ب = ب × أ', bold: true, size: 32, color: '065f46' })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 200 },
-      }));
-      tableFacts.slice(0, 6).forEach((f, i) => {
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: `${i + 1}. `, size: 36, bold: true, color: '047857' }),
-            new TextRun({ text: `${formatNum(num, numberSystem)} × ${formatNum(f.b, numberSystem)} = ______`, size: 36, bold: true }),
-            new TextRun({ text: '     ⇄     ', size: 36, color: '10b981' }),
-            new TextRun({ text: `${formatNum(f.b, numberSystem)} × ${formatNum(num, numberSystem)} = ______`, size: 36, bold: true }),
-          ],
-          spacing: { after: 250 },
-          border: { bottom: { style: BorderStyle.DOTTED, size: 6, color: '10b981' } },
-        }));
-      });
-    } else if (wsType === 'division') {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: 'الضرب والقسمة', bold: true, size: 32, color: '9a3412' })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 200 },
-      }));
-      tableFacts.slice(0, 6).forEach((f, i) => {
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: `${i + 1}. `, size: 36, bold: true, color: 'c2410c' }),
-            new TextRun({ text: `${formatNum(f.result, numberSystem)} ÷ ${formatNum(num, numberSystem)} = ______`, size: 36, bold: true }),
-            new TextRun({ text: '     |     ', size: 36, color: '6b7280' }),
-            new TextRun({ text: `${formatNum(f.result, numberSystem)} ÷ ${formatNum(f.b, numberSystem)} = ______`, size: 36, bold: true }),
-          ],
-          spacing: { after: 250 },
-          border: { bottom: { style: BorderStyle.DOTTED, size: 6, color: 'ea580c' } },
-        }));
-      });
-    } else if (wsType === 'equal') {
-      const equalProducts = getTableEqualProducts(num).slice(0, 4);
-      equalProducts.forEach(({ product, pairs }, i) => {
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: `${i + 1}. `, size: 36, bold: true, color: '86198f' }),
-            new TextRun({ text: `كل المسائل التي ناتجها ${formatNum(product, numberSystem)}:`, size: 36, bold: true }),
-          ],
-          spacing: { after: 80 },
-        }));
-        children.push(new Paragraph({
-          children: [new TextRun({ text: pairs.map(([a, b]) => `${formatNum(a, numberSystem)} × ${formatNum(b, numberSystem)}`).join('   |   '), size: 32, color: 'a21caf' })],
-          spacing: { after: 80 },
-        }));
-        children.push(new Paragraph({
-          children: [new TextRun({ text: '________________________________________________', size: 32, color: '6b7280' })],
-          spacing: { after: 200 },
-        }));
-      });
-    } else if (wsType === 'mixed') {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: 'أكمل الفراغ:', bold: true, size: 32, color: '1e40af' })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 200 },
-      }));
-      tableFacts.forEach((f, i) => {
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: `${i + 1}. `, size: 36, bold: true }),
-            new TextRun({ text: `${formatNum(num, numberSystem)} × `, size: 36, bold: true }),
-            new TextRun({ text: '____', size: 36, color: '6b7280' }),
-            new TextRun({ text: ` = ${formatNum(f.result, numberSystem)}`, size: 36, bold: true }),
-          ],
-          spacing: { after: 130 },
-        }));
-      });
-    } else if (wsType === 'assessment') {
-      children.push(new Paragraph({
-        children: [new TextRun({ text: 'القسم أ: أكمل الفراغ', bold: true, size: 36, color: '5b21b6' })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 200 },
-      }));
-      tableFacts.slice(0, 6).forEach((f, i) => {
-        children.push(new Paragraph({
-          children: [
-            new TextRun({ text: `${i + 1}. ${formatNum(num, numberSystem)} × ${formatNum(f.b, numberSystem)} = `, size: 34, bold: true }),
-            new TextRun({ text: '________', size: 34, color: '6b7280' }),
-          ],
-          spacing: { after: 110 },
-        }));
-      });
-      children.push(new Paragraph({
-        children: [new TextRun({ text: 'القسم ب: صواب أم خطأ', bold: true, size: 36, color: '92400e' })],
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 200 },
-      }));
-      tableFacts.slice(0, 4).forEach((f, i) => {
-        const wrong = Math.random() > 0.5 ? f.result : f.result + (Math.random() > 0.5 ? 1 : -1) * (Math.floor(Math.random() * 4) + 1);
-        children.push(new Paragraph({
-          children: [new TextRun({ text: `${i + 7}. ${formatNum(num, numberSystem)} × ${formatNum(f.b, numberSystem)} = ${formatNum(wrong, numberSystem)}     [  صواب  /  خطأ  ]`, size: 32, bold: true })],
-          spacing: { after: 110 },
-        }));
-      });
-    }
-
-    // Footer
-    children.push(new Paragraph({
-      children: [new TextRun({ text: '🌸⭐🦋🌺    مملكة جدول الضرب    🌺🐝🌸⭐', size: 24, color: '6b7280' })],
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 400 },
-    }));
-
-    const doc = new Document({
-      sections: [{
-        properties: {
-          page: { size: { width: A4_WIDTH_MM * 20, height: A4_HEIGHT_MM * 20 }, margin: { top: 300, bottom: 300, left: 300, right: 300 } },
-        },
-        children,
-      }],
-    });
-
-    const blob = await Packer.toBlob(doc);
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `table-${num}-${wsType}.docx`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    setExporting(false);
-  };
-
   const exportFullPackage = async () => {
     setExporting(true);
     try {
@@ -2586,11 +2380,8 @@ function ExportSection({ num }: { num: number }) {
 
       {renderWorksheetPreview()}
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button onClick={exportPDF} disabled={exporting} className="flex items-center justify-center gap-2 bg-red-500 text-white font-bold py-3 rounded-xl hover:bg-red-600 text-sm disabled:opacity-50"><Download className="w-4 h-4" /> PDF</button>
-        <button onClick={() => exportImage('png')} disabled={exporting} className="flex items-center justify-center gap-2 bg-orange-500 text-white font-bold py-3 rounded-xl hover:bg-orange-600 text-sm disabled:opacity-50"><Download className="w-4 h-4" /> PNG</button>
-        <button onClick={() => exportImage('jpg')} disabled={exporting} className="flex items-center justify-center gap-2 bg-amber-500 text-white font-bold py-3 rounded-xl hover:bg-amber-600 text-sm disabled:opacity-50"><Download className="w-4 h-4" /> JPG</button>
-        <button onClick={exportDOCX} disabled={exporting} className="flex items-center justify-center gap-2 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 text-sm disabled:opacity-50"><Download className="w-4 h-4" /> DOCX</button>
         <button onClick={async () => { if (Capacitor.isNativePlatform()) { await exportPDF(); } else { window.print(); } }} className="flex items-center justify-center gap-2 bg-sky-500 text-white font-bold py-3 rounded-xl hover:bg-sky-600 text-sm"><Printer className="w-4 h-4" /> طباعة</button>
       </div>
 
