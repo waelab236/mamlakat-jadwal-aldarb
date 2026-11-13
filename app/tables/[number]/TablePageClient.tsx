@@ -2103,39 +2103,65 @@ function ExportSection({ num }: { num: number }) {
   // Render worksheet HTML off-screen, capture full height, return array of A4-page canvases
   // DOM-aware pagination: measures each card's position and groups cards into pages.
   // No card is ever split. No blank pages. All content is rendered.
+  const releaseCanvas = (canvas: HTMLCanvasElement) => {
+    canvas.width = 0;
+    canvas.height = 0;
+  };
+
+  const createHiddenFrame = (height: number) => {
+    const frame = document.createElement('iframe');
+    frame.style.position = 'fixed';
+    frame.style.top = '0';
+    frame.style.left = '-10000px';
+    frame.style.width = `${A4_PX_W}px`;
+    frame.style.height = `${height}px`;
+    frame.style.border = 'none';
+    frame.style.visibility = 'hidden';
+    document.body.appendChild(frame);
+    return frame;
+  };
+
   const captureWorksheetPages = async (type: string, tableNum: number): Promise<HTMLCanvasElement[]> => {
     const htmlContent = createA4WorksheetHTML(type, tableNum);
+    const iframe = createHiddenFrame(A4_PX_H * 8);
+    const pages: HTMLCanvasElement[] = [];
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.top = '0';
-    iframe.style.left = '-10000px';
-    iframe.style.width = `${A4_PX_W}px`;
-    iframe.style.height = `${A4_PX_H * 8}px`;
-    iframe.style.border = 'none';
-    iframe.style.visibility = 'hidden';
-    document.body.appendChild(iframe);
+    try {
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc) throw new Error('تعذر تجهيز الصفحة للتصدير');
 
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!iframeDoc) { document.body.removeChild(iframe); return []; }
+      iframeDoc.open();
+      iframeDoc.write(htmlContent);
+      iframeDoc.close();
 
-    iframeDoc.open();
-    iframeDoc.write(htmlContent);
-    iframeDoc.close();
+      await new Promise(r => setTimeout(r, 600));
 
-    // Wait for fonts / layout
-    await new Promise(r => setTimeout(r, 600));
+      const pageEl = iframeDoc.querySelector('.page') as HTMLElement | null;
+      const headerEl = iframeDoc.querySelector('.header') as HTMLElement | null;
+      const decorEl = iframeDoc.querySelector('.decor-bar') as HTMLElement | null;
+      const footerEl = iframeDoc.querySelector('.footer') as HTMLElement | null;
+      const contentEl = iframeDoc.querySelector('.content') as HTMLElement | null;
+      if (!pageEl || !contentEl || !headerEl) throw new Error('تعذر تخطيط ورقة العمل');
 
-    const pageEl = iframeDoc.querySelector('.page') as HTMLElement;
-    if (!pageEl) { document.body.removeChild(iframe); return []; }
+      await captureLaidOutPages(iframeDoc, pageEl, headerEl, decorEl, footerEl, contentEl, pages);
+      return pages;
+    } catch (e) {
+      pages.forEach(releaseCanvas);
+      throw e;
+    } finally {
+      iframe.remove();
+    }
+  };
 
-    const headerEl = iframeDoc.querySelector('.header') as HTMLElement;
-    const decorEl = iframeDoc.querySelector('.decor-bar') as HTMLElement;
-    const footerEl = iframeDoc.querySelector('.footer') as HTMLElement;
-    const contentEl = iframeDoc.querySelector('.content') as HTMLElement;
-
-    if (!contentEl || !headerEl) { document.body.removeChild(iframe); return []; }
-
+  const captureLaidOutPages = async (
+    iframeDoc: Document,
+    pageEl: HTMLElement,
+    headerEl: HTMLElement,
+    decorEl: HTMLElement | null,
+    footerEl: HTMLElement | null,
+    contentEl: HTMLElement,
+    pages: HTMLCanvasElement[],
+  ) => {
     // Measure fixed elements
     const pageStyle = iframeDoc.defaultView!.getComputedStyle(pageEl);
     const paddingTop = parseFloat(pageStyle.paddingTop) || 50;
@@ -2166,7 +2192,6 @@ function ExportSection({ num }: { num: number }) {
     if (currentGroup.length > 0) pageGroups.push(currentGroup);
 
     // For each page group, build a complete A4 page HTML and capture it
-    const pages: HTMLCanvasElement[] = [];
     const headerHTML = headerEl.outerHTML;
     const decorHTML = decorEl?.outerHTML || '';
     const footerHTML = footerEl?.outerHTML || '';
@@ -2195,82 +2220,65 @@ function ExportSection({ num }: { num: number }) {
           ${footerHTML}
         </div></body></html>`;
 
-      const pageIframe = document.createElement('iframe');
-      pageIframe.style.position = 'fixed';
-      pageIframe.style.top = '0';
-      pageIframe.style.left = '-10000px';
-      pageIframe.style.width = `${A4_PX_W}px`;
-      pageIframe.style.height = `${A4_PX_H * 2}px`;
-      pageIframe.style.border = 'none';
-      pageIframe.style.visibility = 'hidden';
-      document.body.appendChild(pageIframe);
+      const pageFrame = createHiddenFrame(A4_PX_H * 2);
+      try {
+        const pageDoc = pageFrame.contentDocument || pageFrame.contentWindow?.document;
+        if (!pageDoc) throw new Error('تعذر تجهيز الصفحة للتصدير');
+        pageDoc.open();
+        pageDoc.write(pageHTML);
+        pageDoc.close();
+        await new Promise(r => setTimeout(r, 400));
 
-      const pageDoc = pageIframe.contentDocument || pageIframe.contentWindow?.document;
-      if (!pageDoc) { document.body.removeChild(pageIframe); continue; }
-      pageDoc.open();
-      pageDoc.write(pageHTML);
-      pageDoc.close();
-      await new Promise(r => setTimeout(r, 400));
-
-      const pageDiv = pageDoc.querySelector('.page') as HTMLElement;
-      if (pageDiv) {
-        const canvas = await html2canvas(pageDiv, {
+        const pageDiv = pageDoc.querySelector('.page') as HTMLElement | null;
+        if (!pageDiv) throw new Error('تعذر تجهيز الصفحة للتصدير');
+        pages.push(await html2canvas(pageDiv, {
           scale: 2, width: A4_PX_W, height: A4_PX_H, useCORS: true, backgroundColor: '#ffffff',
           logging: false, windowWidth: A4_PX_W, scrollX: 0, scrollY: 0,
-        });
-        // Only add non-blank pages
-        if (canvas.width > 10 && canvas.height > 10) {
-          pages.push(canvas);
-        }
+        }));
+      } finally {
+        pageFrame.remove();
       }
-      document.body.removeChild(pageIframe);
     }
-
-    document.body.removeChild(iframe);
-    return pages;
   };
 
-  const exportPDF = async () => {
+  const buildWorksheetPdf = async (types: string[]): Promise<jsPDF> => {
+    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+    let written = 0;
+    for (const type of types) {
+      const pages = await captureWorksheetPages(type, num);
+      for (const canvas of pages) {
+        if (written > 0) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM);
+        releaseCanvas(canvas);
+        written++;
+      }
+    }
+    if (written === 0) throw new Error('لا توجد صفحات للتصدير');
+    return pdf;
+  };
+
+  const exportWorksheetPdf = async (types: string[], fileName: string, errorMessage: string) => {
     setExporting(true);
     try {
-      const pages = await captureWorksheetPages(wsType, num);
-      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-      pages.forEach((canvas, i) => {
-        if (i > 0) pdf.addPage();
-        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM);
-      });
-      const pdfData = pdf.output('datauristring');
-      await saveFileNative(pdfData, `table-${num}-${wsType}.pdf`);
+      const pdf = await buildWorksheetPdf(types);
+      await saveFileNative(pdf.output('datauristring'), fileName);
     } catch (e) {
       console.error('PDF export error:', e);
+      alert(errorMessage);
     } finally {
       setExporting(false);
     }
   };
 
-  const exportFullPackage = async () => {
-    setExporting(true);
-    try {
-      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-      let firstPage = true;
+  const exportPDF = () =>
+    exportWorksheetPdf([wsType], `table-${num}-${wsType}.pdf`, 'تعذر تصدير ورقة العمل إلى PDF. حاول مرة أخرى.');
 
-      for (let i = 0; i < WS_TYPES.length; i++) {
-        const pages = await captureWorksheetPages(WS_TYPES[i].id, num);
-        for (const canvas of pages) {
-          if (!firstPage) pdf.addPage();
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM);
-          firstPage = false;
-        }
-      }
-
-      const pdfData = pdf.output('datauristring');
-      await saveFileNative(pdfData, `table-${num}-full-package.pdf`);
-    } catch (e) {
-      console.error('Full package export error:', e);
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportFullPackage = () =>
+    exportWorksheetPdf(
+      WS_TYPES.map(t => t.id),
+      `table-${num}-full-package.pdf`,
+      'تعذر تصدير الحزمة الكاملة إلى PDF. حاول مرة أخرى.',
+    );
 
   // Preview worksheet (scaled for UI display)
   const renderWorksheetPreview = () => {
